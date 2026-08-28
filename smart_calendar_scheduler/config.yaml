@@ -2,7 +2,7 @@ name: "Smart Calendar Scheduler"
 version: "1.0.0"
 slug: "smart_calendar_scheduler"
 description: "AI Scheduling Engine for Personal Task & Calendar Planning via n8n"
-url: "https://github.com/yourusername/ha-scheduler-addon"
+url: "https://github.com/taothienpeter/ha-scheduler-addon"
 arch:
   - aarch64
   - amd64
