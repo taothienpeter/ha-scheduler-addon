@@ -1,7 +1,7 @@
 import math
 from datetime import datetime
 from typing import List, Dict, Optional, Any
-from .models.schemas import Task, ScheduledSession, CandidateSchedule, ScoreBreakdown, UserPreferences, EnergyProfile
+from src.models.schemas import Task, ScheduledSession, CandidateSchedule, ScoreBreakdown, UserPreferences, EnergyProfile
 from .constraints import parse_iso_datetime
 
 def get_weight(weights: Dict[str, float], keys: List[str], default: float) -> float:

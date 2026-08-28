@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List, Dict, Tuple
-from .models.schemas import Task
+from src.models.schemas import Task
 from .constraints import parse_iso_datetime
 
 PRIORITY_BASE_SCORES = {

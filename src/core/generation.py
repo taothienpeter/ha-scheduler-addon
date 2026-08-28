@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from typing import List, Dict, Tuple, Optional, Any
-from .models.schemas import Task, TimeSlot, ScheduledSession, CandidateSchedule
+from src.models.schemas import Task, TimeSlot, ScheduledSession, CandidateSchedule
 from .constraints import parse_iso_datetime
 
 ALLOWED_DURATIONS = [120, 90, 60, 45, 30]

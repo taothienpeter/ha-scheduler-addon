@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List, Dict, Optional, Any
-from .models.schemas import (
+from src.models.schemas import (
     ScheduleRequest, ScheduleResponse, Task, CandidateSchedule,
     ScheduledSession, UserPreferences
 )
@@ -34,6 +34,15 @@ def run_smart_scheduler_pipeline(request: ScheduleRequest) -> ScheduleResponse:
     # Step 2: Adaptive Learning from Feedback (Estimation Bias)
     if request.recentFeedbackEvents:
         user_pref = update_estimation_bias(user_pref, request.recentFeedbackEvents)
+
+    if not request.tasks:
+        return ScheduleResponse(
+            success=True,
+            sessions=[],
+            updatedTasks=[],
+            score=0.0,
+            message="No tasks provided to schedule."
+        )
 
     # Step 3: Dynamic Urgency & Starvation Aging
     tasks = [calculate_dynamic_urgency(t, current_time) for t in request.tasks]

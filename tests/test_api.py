@@ -27,7 +27,7 @@ def test_schedule_endpoint_empty():
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True
-    assert len(data["schedule"]) == 0
+    assert len(data["sessions"]) == 0
 
 def test_schedule_endpoint_valid_task():
     now = datetime.now()
@@ -52,6 +52,6 @@ def test_schedule_endpoint_valid_task():
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True
-    assert len(data["schedule"]) > 0
-    assert data["schedule"][0]["taskId"] == "t1"
-    assert data["schedule"][0]["duration"] == 60
+    assert len(data["sessions"]) > 0
+    assert data["sessions"][0]["taskId"] == "t1"
+    assert data["sessions"][0]["duration"] == 60

@@ -1,7 +1,7 @@
 import time
 from datetime import datetime, timedelta
 from typing import List, Dict, Tuple, Optional
-from .models.schemas import Task, ScheduledSession, CandidateSchedule, FixedEvent, UserPreferences
+from src.models.schemas import Task, ScheduledSession, CandidateSchedule, FixedEvent, UserPreferences
 from .constraints import parse_iso_datetime, validate_hard_constraints
 from .evaluator import evaluate_schedule
 

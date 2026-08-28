@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, time
 from typing import List, Dict, Tuple, Optional, Any
-from .models.schemas import Task, FixedEvent, UserPreferences, ScheduledSession, TimeSlot
+from src.models.schemas import Task, FixedEvent, UserPreferences, ScheduledSession, TimeSlot
 
 def parse_iso_datetime(dt_str: Optional[str]) -> Optional[datetime]:
     if not dt_str:

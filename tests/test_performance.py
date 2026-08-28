@@ -50,6 +50,6 @@ def test_performance_100_tasks():
     assert peak_mem_mb < 150.0, f"Memory usage too high: {peak_mem_mb}MB"
     
     assert res.success is True
-    assert len(res.schedule) > 0
+    assert len(res.sessions) > 0
     
     print(f"Performance Test - Elapsed: {elapsed_ms:.2f}ms, Peak Memory: {peak_mem_mb:.2f}MB")

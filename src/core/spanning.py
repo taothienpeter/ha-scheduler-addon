@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple, Any
-from .models.schemas import (
+from src.models.schemas import (
     Task, ScheduledSession, CandidateSchedule, UserPreferences,
     UserFeedbackEvent, XAIReport, XAISummary, TaskExplanation, EnergyProfile
 )
@@ -149,7 +149,7 @@ def generate_xai_report(
     )
 
     return XAIReport(
-        timestamp=datetime.utcnow().isoformat(),
+        timestamp=datetime.now().isoformat(),
         summary=summary,
         taskExplanations=task_explanations,
         insightsAndTips=insights_and_tips

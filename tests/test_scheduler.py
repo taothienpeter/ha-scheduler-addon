@@ -136,8 +136,8 @@ class TestSmartScheduler(unittest.TestCase):
         )
         res = run_smart_scheduler_pipeline(req)
         self.assertTrue(res.success)
-        self.assertEqual(len(res.schedule), 0)
-        self.assertEqual(len(res.unassignedTasks), 0)
+        self.assertEqual(len(res.sessions), 0)
+        self.assertEqual(len(res.updatedTasks), 0)
 
     def test_evaluator_penalties(self):
         # Create a candidate schedule with fragmentation and switching costs
@@ -176,11 +176,12 @@ class TestSmartScheduler(unittest.TestCase):
         from src.models.schemas import CandidateSchedule
 
         # Initial schedule where T1 is scheduled, T2 is unassigned but has high urgency
-        t1 = Task(id="t1", name="Task 1", estimated_effort=90, priority=2)
-        t2 = Task(id="t2", name="Task 2 (Urgent)", estimated_effort=30, priority=5, isStarved=True, effectiveUrgency=200.0)
+        t1 = Task(id="t1", name="Task 1", estimated_effort=90, priority=4)
+        t2 = Task(id="t2", name="Task 2 (Urgent)", estimated_effort=30, priority=1, isStarved=True)
         
         t1 = calculate_dynamic_urgency(t1, self.base_time)
         t2 = calculate_dynamic_urgency(t2, self.base_time)
+        t2.effectiveUrgency = 200.0
 
         s1 = ScheduledSession(
             sessionId="s1", taskId="t1", taskName="Task 1",

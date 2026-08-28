@@ -208,7 +208,7 @@ class XAIReport(BaseModel):
     insightsAndTips: List[str]
 
 class ScheduleRequest(BaseModel):
-    tasks: List[Task] = Field(..., min_length=1)
+    tasks: List[Task] = Field(default_factory=list)
     fixedEvents: List[FixedEvent] = Field(default_factory=list)
     userPreferences: Optional[UserPreferences] = Field(default_factory=UserPreferences)
     current_time: Optional[str] = None # ISO format datetime (optional for testing/simulation)
