@@ -10,16 +10,14 @@ LABEL \
   io.hass.type="addon" \
   io.hass.arch="${BUILD_ARCH}"
 
-# Install Python3, virtualenv support, and system tools
-# NOTE: Python 3.14 on this Alpine is PEP 668 "externally managed"
-# We MUST use a venv - do NOT call pip or ensurepip on the system Python
+# Install Python3 and virtualenv
 RUN apk add --no-cache \
     python3 \
     py3-virtualenv \
     curl \
     tzdata
 
-# Create virtualenv - pip inside venv is NOT externally managed
+# Create virtualenv — avoids PEP 668 restriction on system Python
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
@@ -29,9 +27,10 @@ COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ /app/src/
-COPY run.sh /app/
-RUN chmod +x /app/run.sh
+
+# s6-overlay service setup:
+# HA base image uses s6-overlay as init — services must be in /etc/services.d/
+COPY run.sh /etc/services.d/scheduler/run
+RUN chmod a+x /etc/services.d/scheduler/run
 
 EXPOSE 5000
-
-CMD ["/app/run.sh"]
