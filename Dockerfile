@@ -1,8 +1,8 @@
-ARG BUILD_FROM=python:3.11-alpine
+ARG BUILD_FROM=ghcr.io/home-assistant/base:latest
 
 FROM ${BUILD_FROM}
 
-# Build arguments injected by HA CI/Supervisor
+# Build arguments injected by HA Supervisor
 ARG BUILD_VERSION
 ARG BUILD_ARCH
 
@@ -12,14 +12,19 @@ LABEL \
   io.hass.type="addon" \
   io.hass.arch="${BUILD_ARCH}"
 
-# Set timezone support and curl for watchdog healthcheck
-RUN apk add --no-cache curl tzdata
+# Install Python3, pip, and system dependencies
+# HA base image is Alpine Linux - no Python pre-installed
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    curl \
+    tzdata
 
 WORKDIR /app
 
-# Install Python dependencies
+# Install Python dependencies into system (not venv) to avoid conflict
 COPY requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 
 # Copy application source
 COPY src/ /app/src/
