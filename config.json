@@ -1,6 +1,6 @@
 {
   "name": "Smart Calendar Scheduler",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "slug": "smart_calendar_scheduler",
   "description": "AI Scheduling Engine for personal task planning. Called by n8n workflows via HTTP POST.",
   "url": "https://github.com/taothienpeter/ha-scheduler-addon",
@@ -11,6 +11,7 @@
   ],
   "startup": "application",
   "boot": "auto",
+  "init": false,
   "ports": {
     "5000/tcp": 5000
   },

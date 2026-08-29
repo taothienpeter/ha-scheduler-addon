@@ -1,15 +1,16 @@
-#!/usr/bin/with-contenv bashio
+#!/bin/sh
+set -e
 
-# Activate virtual environment
+# Activate the virtual environment created in Dockerfile
 export PATH="/opt/venv/bin:$PATH"
 
-LOG_LEVEL=$(bashio::config 'log_level' 'info')
-
-bashio::log.info "Starting Smart Calendar Scheduler..."
-bashio::log.info "Port: 5000 | Log level: ${LOG_LEVEL}"
+echo "=================================================="
+echo " Smart Calendar Scheduler v1.0.6 Starting"
+echo " Listening on http://0.0.0.0:5000"
+echo " Endpoints: GET /health | POST /api/schedule"
+echo "=================================================="
 
 exec uvicorn src.main:app \
     --host 0.0.0.0 \
     --port 5000 \
-    --log-level "${LOG_LEVEL}" \
-    --app-dir /app
+    --log-level info

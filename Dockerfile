@@ -10,14 +10,14 @@ LABEL \
   io.hass.type="addon" \
   io.hass.arch="${BUILD_ARCH}"
 
-# Install Python3 and virtualenv
+# Install Python3, virtualenv, curl for healthcheck
 RUN apk add --no-cache \
     python3 \
     py3-virtualenv \
     curl \
     tzdata
 
-# Create virtualenv — avoids PEP 668 restriction on system Python
+# Create virtualenv — avoids PEP 668 on Python 3.14
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
@@ -27,10 +27,10 @@ COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ /app/src/
-
-# s6-overlay service setup:
-# HA base image uses s6-overlay as init — services must be in /etc/services.d/
-COPY run.sh /etc/services.d/scheduler/run
-RUN chmod a+x /etc/services.d/scheduler/run
+COPY run.sh /app/run.sh
+RUN chmod +x /app/run.sh
 
 EXPOSE 5000
+
+# init: false in config.json means HA Supervisor runs CMD directly (no s6-overlay)
+CMD ["/app/run.sh"]
