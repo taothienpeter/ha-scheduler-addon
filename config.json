@@ -1,6 +1,6 @@
 {
   "name": "Smart Calendar Scheduler",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "slug": "smart_calendar_scheduler",
   "description": "AI Scheduling Engine for personal task planning. Called by n8n workflows via HTTP POST.",
   "url": "https://github.com/taothienpeter/ha-scheduler-addon",
