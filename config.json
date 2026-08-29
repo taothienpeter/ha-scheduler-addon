@@ -1,13 +1,12 @@
 {
   "name": "Smart Calendar Scheduler",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "slug": "smart_calendar_scheduler",
   "description": "AI Scheduling Engine for personal task planning. Called by n8n workflows via HTTP POST.",
   "url": "https://github.com/taothienpeter/ha-scheduler-addon",
   "arch": [
     "aarch64",
     "amd64",
-    "armhf",
     "armv7"
   ],
   "startup": "application",
@@ -19,7 +18,7 @@
     "5000/tcp": "FastAPI Scheduler API (for n8n HTTP node)"
   },
   "map": [
-    "config:rw"
+    "homeassistant_config:rw"
   ],
   "options": {
     "log_level": "info"
@@ -27,7 +26,5 @@
   "schema": {
     "log_level": "list(info|debug|warning|error)?"
   },
-  "watchdog": "http://[HOST]:[PORT:5000]/health",
-  "icon": "icon.png",
-  "logo": "logo.png"
+  "watchdog": "http://[HOST]:[PORT:5000]/health"
 }

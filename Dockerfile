@@ -12,19 +12,21 @@ LABEL \
   io.hass.type="addon" \
   io.hass.arch="${BUILD_ARCH}"
 
-# Install Python3, pip, and system dependencies
-# HA base image is Alpine Linux - no Python pre-installed
+# Install Python3, pip, and system deps on HA Alpine base image
 RUN apk add --no-cache \
     python3 \
     py3-pip \
+    py3-setuptools \
     curl \
-    tzdata
+    tzdata && \
+    python3 -m ensurepip --upgrade && \
+    python3 -m pip install --no-cache-dir --upgrade pip
 
 WORKDIR /app
 
-# Install Python dependencies into system (not venv) to avoid conflict
+# Install Python dependencies
 COPY requirements.txt /app/
-RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
+RUN python3 -m pip install --no-cache-dir -r requirements.txt
 
 # Copy application source
 COPY src/ /app/src/
