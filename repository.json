@@ -1,5 +1,4 @@
 {
-  "name": "Smart Calendar Scheduler Add-ons",
-  "url": "https://github.com/taothienpeter/ha-scheduler-addon",
-  "maintainer": "Tao Thien <taothienpeter>"
+    "name": "Smart Calendar Scheduler",
+    "maintainer": "taothienpeter"
 }
