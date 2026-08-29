@@ -104,6 +104,10 @@ class ValidationResult:
         self.valid = valid
         self.violations = violations
 
+    @property
+    def is_valid(self) -> bool:
+        return self.valid
+
 def validate_hard_constraints(
     sessions: List[ScheduledSession],
     all_tasks: List[Task],
