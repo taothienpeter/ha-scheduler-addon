@@ -288,5 +288,83 @@ class TestFullPipeline(unittest.TestCase):
             UserPreferences(working_hours=[600, 500])
 
 
+# ============================================================================
+# COMPATIBILITY ALIAS CLASS (Đảm bảo cache Test Explorer trong IDE chạy 100%)
+# ============================================================================
+class TestSmartScheduler(unittest.TestCase):
+
+    def setUp(self):
+        self.base_time = datetime(2026, 8, 29, 8, 0, 0)
+        self.pref = UserPreferences(working_hours=[480, 1020], buffer_time=15)
+
+    def test_dynamic_urgency_and_slack(self):
+        deadline = (self.base_time + timedelta(hours=4)).isoformat()
+        t = Task(id="t1", name="Urgent Task", estimated_effort=120, deadline=deadline, priority=2)
+        evaluated = calculate_dynamic_urgency(t, self.base_time)
+        self.assertEqual(evaluated.slack_minutes, 120)
+        self.assertEqual(evaluated.effectiveUrgency, 140.0)
+
+    def test_starvation_aging(self):
+        t = Task(id="t2", name="Starved Task", estimated_effort=60, deferral_count=3, priority=4)
+        t_eval = calculate_dynamic_urgency(t, self.base_time)
+        aged = apply_starvation_aging([t_eval], max_deferral_threshold=3)[0]
+        self.assertTrue(aged.isStarved)
+        self.assertGreater(aged.effectiveUrgency, 30.0)
+
+    def test_candidate_session_generation_bounded(self):
+        combos = generate_candidate_sessions(480)
+        self.assertTrue(len(combos) > 0)
+        self.assertEqual(sum(combos[0]), 480)
+
+    def test_hard_constraint_inter_session_overlap(self):
+        s1 = ScheduledSession(sessionId="s1", taskId="t1", taskName="T1", startTime="2026-08-29T09:00:00Z", endTime="2026-08-29T10:00:00Z", duration=60)
+        s2 = ScheduledSession(sessionId="s2", taskId="t2", taskName="T2", startTime="2026-08-29T09:30:00Z", endTime="2026-08-29T10:30:00Z", duration=60)
+        val = validate_hard_constraints([s1, s2], [Task(id="t1", name="T1", estimated_effort=60), Task(id="t2", name="T2", estimated_effort=60)], [])
+        self.assertFalse(val.is_valid)
+
+    def test_dependency_unfulfilled_constraint(self):
+        task_a = Task(id="tA", name="Task A", estimated_effort=60, remaining_effort=60)
+        task_b = Task(id="tB", name="Task B", estimated_effort=60, dependencies=["tA"])
+        sA = ScheduledSession(sessionId="sA", taskId="tA", taskName="Task A", startTime="2026-08-29T09:00:00Z", endTime="2026-08-29T09:30:00Z", duration=30)
+        sB = ScheduledSession(sessionId="sB", taskId="tB", taskName="Task B", startTime="2026-08-29T10:00:00Z", endTime="2026-08-29T11:00:00Z", duration=60)
+        val = validate_hard_constraints([sA, sB], [task_a, task_b], [])
+        self.assertFalse(val.is_valid)
+
+    def test_weight_aliases_and_energy_bonus(self):
+        pref_alias = UserPreferences(weights={"w_c": 2.0, "w_t": 5.0, "w_s": 10.0, "w_f": 10.0, "w_o": 1.0, "w_p": 10.0})
+        req = ScheduleRequest(tasks=[Task(id="t_code", name="Coding Task", estimated_effort=60, contextType="coding")], userPreferences=pref_alias, current_time=self.base_time.isoformat())
+        res = run_smart_scheduler_pipeline(req)
+        self.assertTrue(res.success)
+
+    def test_pydantic_input_validation(self):
+        with self.assertRaises(Exception):
+            Task(id="bad", name="Bad Task", estimated_effort=0)
+
+    def test_empty_schedule(self):
+        req = ScheduleRequest(tasks=[], userPreferences=self.pref, current_time=self.base_time.isoformat())
+        res = run_smart_scheduler_pipeline(req)
+        self.assertTrue(res.success)
+        self.assertEqual(len(res.sessions), 0)
+
+    def test_evaluator_penalties(self):
+        t1 = Task(id="t1", name="Coding", estimated_effort=60, contextType="coding")
+        t2 = Task(id="t2", name="Writing", estimated_effort=60, contextType="writing")
+        s1 = ScheduledSession(sessionId="s1", taskId="t1", taskName="Coding", startTime=self.base_time.isoformat(), endTime=(self.base_time + timedelta(minutes=60)).isoformat(), duration=60, contextType="coding")
+        s2 = ScheduledSession(sessionId="s2", taskId="t2", taskName="Writing", startTime=(self.base_time + timedelta(minutes=75)).isoformat(), endTime=(self.base_time + timedelta(minutes=135)).isoformat(), duration=60, contextType="writing")
+        sched = CandidateSchedule(id="test", sessions=[s1, s2], remainingSlots=[{"startTime": (self.base_time + timedelta(minutes=135)).isoformat(), "endTime": (self.base_time + timedelta(minutes=145)).isoformat(), "duration": 10}])
+        evaluated = evaluate_schedule(sched, [t1, t2], self.pref)
+        self.assertEqual(evaluated.scoreBreakdown.switchingCostPenalty, 15.0)
+        self.assertEqual(evaluated.scoreBreakdown.fragmentationPenalty, 20.0)
+
+    def test_repair_engine_resolution(self):
+        t1 = Task(id="t1", name="Task 1", estimated_effort=90, priority=4)
+        t2 = Task(id="t2", name="Task 2 (Urgent)", estimated_effort=30, priority=1, isStarved=True, effectiveUrgency=200.0)
+        s1 = ScheduledSession(sessionId="s1", taskId="t1", taskName="Task 1", startTime=self.base_time.isoformat(), endTime=(self.base_time + timedelta(minutes=90)).isoformat(), duration=90)
+        sched = CandidateSchedule(id="base", sessions=[s1])
+        repaired = run_schedule_repair_engine(sched, [t1, t2], [], self.pref, max_attempts=5)
+        self.assertEqual(len(repaired.sessions), 2)
+
+
 if __name__ == "__main__":
     unittest.main()
+
