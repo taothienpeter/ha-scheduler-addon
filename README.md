@@ -1,6 +1,6 @@
 # Smart Calendar Scheduler — Home Assistant OS (HAOS) Add-on
 
-Hệ thống lập lịch thông minh thế hệ mới (Smart Schedule Engine V3) dành cho Home Assistant và n8n.
+Hệ thống lập lịch thông minh thế hệ mới (Smart Schedule Engine) dành cho Home Assistant và n8n.
 
 ---
 

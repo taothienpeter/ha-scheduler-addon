@@ -1,7 +1,7 @@
 # Smart Calendar Scheduler — Home Assistant Add-on
 
 ## 1. Giới thiệu (Overview)
-Add-on này cung cấp một microservice chạy nền (FastAPI) để thực thi thuật toán xếp lịch cá nhân hóa (Smart Scheduling V3). 
+Add-on này cung cấp một microservice chạy nền (FastAPI) để thực thi thuật toán xếp lịch cá nhân hóa (Smart Scheduling). 
 Mục đích chính là hoạt động như một **Execution Engine** độc lập, nhận yêu cầu từ các workflow của **n8n** (hoặc AppDaemon/Home Assistant Automation), tính toán lịch trình tối ưu và trả về kết quả JSON.
 
 ---
