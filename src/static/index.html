@@ -185,7 +185,94 @@
       </div>
     </section>
 
-    <!-- SECTION 3: Detail Inspector & XAI Panel -->
+    <!-- SECTION 3: Latest n8n Execution Inspector -->
+    <section class="glass-panel n8n-section" id="n8nSection">
+      <div class="section-title-row">
+        <div class="section-title">
+          <span>📡 Nhật Ký Phân Lịch n8n Gần Nhất</span>
+          <span class="badge" id="n8nStatusBadge">Chờ request...</span>
+        </div>
+
+        <div class="n8n-header-actions">
+          <div class="n8n-live-toggle">
+            <label class="toggle-switch">
+              <input type="checkbox" id="chkAutoSync" checked>
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">Live Sync (3s)</span>
+          </div>
+
+          <button id="btnFetchN8n" class="btn-secondary" title="Làm mới ngay">
+            <span>🔄 Làm Mới</span>
+          </button>
+
+          <button id="btnProjectToTimeline" class="btn-project" title="Chiếu dữ liệu n8n lên Timeline & Sơ đồ Flow">
+            <span>📊 Chiếu Lên Timeline & Sơ Đồ Flow</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Execution Meta Bar -->
+      <div class="n8n-meta-bar" id="n8nMetaBar">
+        <div class="meta-item">
+          <span class="meta-label">THỜI ĐIỂM:</span>
+          <span class="meta-val" id="n8nTime">--</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">NGUỒN GỌI:</span>
+          <span class="meta-val" id="n8nClientIp">--</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">THỜI GIAN XỬ LÝ:</span>
+          <span class="meta-val highlight-green" id="n8nElapsed">--</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">SỐ LƯỢNG TASK:</span>
+          <span class="meta-val" id="n8nTaskCount">--</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">SỐ PHIÊN XẾP ĐƯỢC:</span>
+          <span class="meta-val highlight-purple" id="n8nSessionCount">--</span>
+        </div>
+      </div>
+
+      <!-- Tab Navigation -->
+      <div class="n8n-tabs-bar">
+        <button class="n8n-tab active" data-tab="tabRequest">📥 1. Request từ n8n (Payload Vào)</button>
+        <button class="n8n-tab" data-tab="tabTrace">⚙️ 2. Tiến Trình 12 Bước (Pipeline Trace)</button>
+        <button class="n8n-tab" data-tab="tabResponse">📤 3. Response Trả Về (Lịch Trình & XAI)</button>
+      </div>
+
+      <!-- Tab Contents -->
+      <div class="n8n-tab-contents">
+        <!-- Tab 1: Request -->
+        <div class="n8n-tab-panel active" id="tabRequest">
+          <div class="json-viewer-header">
+            <span>Gói tin JSON n8n đã gửi tới <code>POST /api/schedule</code>:</span>
+            <button class="btn-copy" id="btnCopyRequest">📋 Copy JSON</button>
+          </div>
+          <pre class="json-code-block"><code id="n8nRequestCode">// Chưa có request nào từ n8n được ghi nhận kể từ khi khởi động...</code></pre>
+        </div>
+
+        <!-- Tab 2: Trace (12 Steps) -->
+        <div class="n8n-tab-panel" id="tabTrace">
+          <div class="trace-grid" id="n8nTraceGrid">
+            <!-- Dynamic 12-Step telemetry cards injected here -->
+          </div>
+        </div>
+
+        <!-- Tab 3: Response -->
+        <div class="n8n-tab-panel" id="tabResponse">
+          <div class="json-viewer-header">
+            <span>Gói tin JSON thuật toán phản hồi về cho n8n:</span>
+            <button class="btn-copy" id="btnCopyResponse">📋 Copy JSON</button>
+          </div>
+          <pre class="json-code-block"><code id="n8nResponseCode">// Chưa có dữ liệu response...</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 4: Detail Inspector & XAI Panel -->
     <section class="inspector-grid">
       <!-- XAI Explanations -->
       <div class="glass-panel inspector-card">

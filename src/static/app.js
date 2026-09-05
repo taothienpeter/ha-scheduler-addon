@@ -8,14 +8,17 @@
   const BASE_PATH = window.location.pathname.replace(/\/$/, '');
   const API_PRESETS_URL = `${BASE_PATH}/api/presets`;
   const API_SCHEDULE_URL = `${BASE_PATH}/api/schedule`;
+  const API_LATEST_EXEC_URL = `${BASE_PATH}/api/latest-execution`;
 
   // Central Application State
   const AppState = {
     presets: {},
     currentPayload: null,
     currentResponse: null,
+    latestN8nExecution: null,
     activeTierHighlight: null,
-    selectedSessionId: null
+    selectedSessionId: null,
+    autoSyncTimer: null
   };
 
   // Color Palettes for Task Sessions
@@ -27,7 +30,7 @@
     { bg: 'linear-gradient(135deg, #f59e0b, #d97706)', border: '#fbbf24' }
   ];
 
-  // DOM Elements
+  // DOM Elements - Top Controls
   const elPresetSelect = document.getElementById('presetSelect');
   const elBtnOptimize = document.getElementById('btnOptimize');
   const elEngineStatusText = document.getElementById('engineStatusText');
@@ -38,7 +41,7 @@
   const elXaiList = document.getElementById('xaiList');
   const elTooltip = document.getElementById('dashboardTooltip');
 
-  // Score Table Elements
+  // DOM Elements - Score Table
   const elValEnergy = document.getElementById('valEnergyBonus');
   const elValPref = document.getElementById('valPrefBonus');
   const elValSwitch = document.getElementById('valSwitchPenalty');
@@ -46,20 +49,38 @@
   const elValTardiness = document.getElementById('valTardinessPenalty');
   const elValTotal = document.getElementById('valTotalScore');
 
-  // Metrics Badges
+  // DOM Elements - Flow Metrics Badges
   const elMetricsT1 = document.getElementById('metricsTier1');
   const elMetricsT2 = document.getElementById('metricsTier2');
   const elMetricsT3 = document.getElementById('metricsTier3');
   const elMetricsT4 = document.getElementById('metricsTier4');
   const elMetricsT5 = document.getElementById('metricsTier5');
 
+  // DOM Elements - n8n Execution Inspector
+  const elN8nStatusBadge = document.getElementById('n8nStatusBadge');
+  const elN8nTime = document.getElementById('n8nTime');
+  const elN8nClientIp = document.getElementById('n8nClientIp');
+  const elN8nElapsed = document.getElementById('n8nElapsed');
+  const elN8nTaskCount = document.getElementById('n8nTaskCount');
+  const elN8nSessionCount = document.getElementById('n8nSessionCount');
+  const elN8nRequestCode = document.getElementById('n8nRequestCode');
+  const elN8nTraceGrid = document.getElementById('n8nTraceGrid');
+  const elN8nResponseCode = document.getElementById('n8nResponseCode');
+  const elBtnFetchN8n = document.getElementById('btnFetchN8n');
+  const elBtnProjectToTimeline = document.getElementById('btnProjectToTimeline');
+  const elChkAutoSync = document.getElementById('chkAutoSync');
+  const elBtnCopyRequest = document.getElementById('btnCopyRequest');
+  const elBtnCopyResponse = document.getElementById('btnCopyResponse');
+
   // Init
   window.addEventListener('DOMContentLoaded', initApp);
 
   async function initApp() {
     setupEventListeners();
+    setupN8nSection();
     await loadPresets();
-    triggerOptimization();
+    await triggerOptimization();
+    await fetchLatestN8nExecution(true);
   }
 
   function setupEventListeners() {
@@ -71,7 +92,7 @@
       }
     });
 
-    elBtnOptimize.addEventListener('click', triggerOptimization);
+    elBtnOptimize.addEventListener('click', () => triggerOptimization());
 
     // Flow Tier Card Click Handlers (Bi-directional sync)
     document.querySelectorAll('.flow-card').forEach(card => {
@@ -79,6 +100,67 @@
         const tier = parseInt(card.getAttribute('data-tier'), 10);
         toggleTierHighlight(tier, card);
       });
+    });
+  }
+
+  function setupN8nSection() {
+    // Tab switching
+    document.querySelectorAll('.n8n-tab').forEach(tabBtn => {
+      tabBtn.addEventListener('click', () => {
+        document.querySelectorAll('.n8n-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.n8n-tab-panel').forEach(p => p.classList.remove('active'));
+
+        tabBtn.classList.add('active');
+        const targetId = tabBtn.getAttribute('data-tab');
+        const panel = document.getElementById(targetId);
+        if (panel) panel.classList.add('active');
+      });
+    });
+
+    // Refresh button
+    if (elBtnFetchN8n) {
+      elBtnFetchN8n.addEventListener('click', () => fetchLatestN8nExecution(false));
+    }
+
+    // Project to Timeline button
+    if (elBtnProjectToTimeline) {
+      elBtnProjectToTimeline.addEventListener('click', projectLatestN8nToDashboard);
+    }
+
+    // Copy buttons
+    if (elBtnCopyRequest) {
+      elBtnCopyRequest.addEventListener('click', () => copyToClipboard(elN8nRequestCode.textContent, elBtnCopyRequest));
+    }
+    if (elBtnCopyResponse) {
+      elBtnCopyResponse.addEventListener('click', () => copyToClipboard(elN8nResponseCode.textContent, elBtnCopyResponse));
+    }
+
+    // Auto-sync toggle (3 seconds interval)
+    if (elChkAutoSync) {
+      elChkAutoSync.addEventListener('change', () => {
+        toggleAutoSync(elChkAutoSync.checked);
+      });
+      toggleAutoSync(elChkAutoSync.checked);
+    }
+  }
+
+  function toggleAutoSync(enable) {
+    if (AppState.autoSyncTimer) {
+      clearInterval(AppState.autoSyncTimer);
+      AppState.autoSyncTimer = null;
+    }
+    if (enable) {
+      AppState.autoSyncTimer = setInterval(() => {
+        fetchLatestN8nExecution(true);
+      }, 3000);
+    }
+  }
+
+  function copyToClipboard(text, btnEl) {
+    navigator.clipboard.writeText(text).then(() => {
+      const originalText = btnEl.textContent;
+      btnEl.textContent = '✅ Đã Copy!';
+      setTimeout(() => { btnEl.textContent = originalText; }, 1800);
     });
   }
 
@@ -141,6 +223,135 @@
     }
   }
 
+  // --- N8N EXECUTION INSPECTOR ---
+  async function fetchLatestN8nExecution(silent = false) {
+    try {
+      const resp = await fetch(API_LATEST_EXEC_URL);
+      if (!resp.ok) return;
+
+      const resJson = await resp.json();
+      if (resJson.status !== 'ok' || !resJson.data) {
+        if (!silent) {
+          elN8nStatusBadge.textContent = 'Chưa có request từ n8n';
+          elN8nStatusBadge.style.color = 'var(--text-dim)';
+        }
+        return;
+      }
+
+      const exec = resJson.data;
+      const isNew = !AppState.latestN8nExecution || AppState.latestN8nExecution.timestamp !== exec.timestamp;
+      AppState.latestN8nExecution = exec;
+
+      // Update Header & Meta
+      elN8nStatusBadge.textContent = `Đã nhận lúc ${exec.timestamp.split(' ')[1] || exec.timestamp}`;
+      elN8nStatusBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+      elN8nStatusBadge.style.color = '#34d399';
+
+      elN8nTime.textContent = exec.timestamp;
+      elN8nClientIp.textContent = `${exec.client_ip} (n8n/client)`;
+      elN8nElapsed.textContent = `${Math.round(exec.elapsed_seconds * 1000)}ms`;
+
+      const reqTasks = (exec.request && exec.request.tasks) || [];
+      const resSessions = (exec.response && exec.response.sessions) || [];
+      elN8nTaskCount.textContent = `${reqTasks.length} tasks`;
+      elN8nSessionCount.textContent = `${resSessions.length} sessions`;
+
+      // Tab 1: Request JSON
+      elN8nRequestCode.textContent = JSON.stringify(exec.request, null, 2);
+
+      // Tab 2: 12-Step Trace Cards
+      render12StepTrace(exec);
+
+      // Tab 3: Response JSON
+      elN8nResponseCode.textContent = JSON.stringify(exec.response, null, 2);
+
+      // Flash feedback if new
+      if (isNew && !silent) {
+        elN8nStatusBadge.style.boxShadow = '0 0 16px var(--emerald)';
+        setTimeout(() => { elN8nStatusBadge.style.boxShadow = 'none'; }, 1500);
+      }
+
+    } catch (err) {
+      if (!silent) console.error('Fetch latest execution failed:', err);
+    }
+  }
+
+  function render12StepTrace(exec) {
+    if (!elN8nTraceGrid) return;
+    elN8nTraceGrid.innerHTML = '';
+
+    const trace = (exec.response && exec.response.pipelineTrace) || {};
+    const req = exec.request || {};
+    const buckets = trace.strategyBuckets || {};
+
+    const steps = [
+      {
+        title: 'Tầng 1 (B1-3): Quy Hoạch & Free Slots',
+        icon: '🛡️',
+        desc: `Phát hiện <b>${trace.freeSlotsCount || 0} slot trống</b> (Tổng: <b>${((trace.totalFreeMinutes || 0) / 60).toFixed(1)} giờ</b>) sau khi trừ <b>${(req.fixedEvents || []).length} sự kiện cố định</b>.`
+      },
+      {
+        title: 'Tầng 2 (B4-6): Urgency & Buckets',
+        icon: '⚡',
+        desc: `Phân loại task: <b>${(buckets.critical || []).length} Critical</b>, <b>${(buckets.competition || []).length} Competition</b>, <b>${(buckets.normal || []).length} Normal</b> dựa trên Slack time và Starvation aging.`
+      },
+      {
+        title: 'Tầng 3 (B7-8): Chunking & Ứng Viên',
+        icon: '🧩',
+        desc: `Sinh ra <b>${trace.candidatesEvaluatedCount || 1} kịch bản hoán vị</b> (Interleaved vs Batching). Áp dụng chunk kích thước 30m / 45m / 60m / 90m / 120m.`
+      },
+      {
+        title: 'Tầng 4 (B9-11): Objective J & Tối Ưu',
+        icon: '🎯',
+        desc: `Điểm ban đầu: <b>${(trace.initialScore || 0).toFixed(1)}</b>. Áp dụng <b>${trace.repairsApplied || 0} sửa lỗi Repair</b> và 2-Opt local search đạt điểm <b>${(trace.finalScore || 0).toFixed(1)}</b>.`
+      },
+      {
+        title: 'Tầng 5 (B12): Chốt Lịch & XAI',
+        icon: '📊',
+        desc: `Hành động: <b>${trace.stabilityAction || 'COMMITTED'}</b> (Cải thiện: <b>${(trace.stabilityImprovementRate || 0).toFixed(1)}%</b>). Tạo thành công văn bản giải trình lý do xếp lịch.`
+      }
+    ];
+
+    steps.forEach(st => {
+      const card = document.createElement('div');
+      card.className = 'trace-card';
+      card.innerHTML = `
+        <div class="trace-card-title">${st.icon} ${st.title}</div>
+        <div class="trace-card-content">${st.desc}</div>
+      `;
+      elN8nTraceGrid.appendChild(card);
+    });
+  }
+
+  function projectLatestN8nToDashboard() {
+    if (!AppState.latestN8nExecution) {
+      alert('Chưa có dữ liệu n8n nào để chiếu lên Timeline!');
+      return;
+    }
+
+    const exec = AppState.latestN8nExecution;
+    AppState.currentPayload = exec.request;
+    AppState.currentResponse = exec.response;
+
+    // Render onto Gantt Timeline and Pipeline Flow
+    renderGanttTimeline(exec.response, exec.request);
+    renderPipelineFlowMetrics(exec.response);
+    renderScoreBreakdown(exec.response.scoreBreakdown);
+    renderXAIReport(exec.response.xaiReport);
+
+    // Scroll to Top Timeline smoothly
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Flash Horizon badge to notify user
+    elHorizonBadge.style.background = 'rgba(16, 185, 129, 0.3)';
+    elHorizonBadge.style.color = '#34d399';
+    elHorizonBadge.textContent = `Lịch thực tế từ n8n (${exec.timestamp})`;
+    setTimeout(() => {
+      elHorizonBadge.style.background = 'rgba(99, 102, 241, 0.2)';
+      elHorizonBadge.style.color = '#a5b4fc';
+    }, 2500);
+  }
+
   // --- 1. RENDER GANTT TIMELINE ---
   function renderGanttTimeline(response, requestPayload) {
     elTimelineRuler.innerHTML = '';
@@ -196,14 +407,7 @@
       }
     }
 
-    // 1.4 Render Free Slots
-    // Approximate free slots by inspecting gaps or pipeline free slots
-    if (response.pipelineTrace && response.pipelineTrace.freeSlotsCount > 0) {
-      // Create visual slot representations
-      renderFreeSlotsLayer(horizonStart, totalMinutes);
-    }
-
-    // 1.5 Render Fixed Events (Meetings)
+    // 1.4 Render Fixed Events (Meetings)
     if (requestPayload.fixedEvents) {
       requestPayload.fixedEvents.forEach(fe => {
         const sTime = new Date(fe.startTime);
@@ -225,7 +429,7 @@
       });
     }
 
-    // 1.6 Render Scheduled Sessions
+    // 1.5 Render Scheduled Sessions
     const taskColorMap = {};
     let colorIdx = 0;
 
@@ -287,69 +491,78 @@
     }
   }
 
-  function renderFreeSlotsLayer(horizonStart, totalMinutes) {
-    // Generate soft background slots where no fixed events exist
-    // Visual aid for Free Slots
-  }
-
   // --- 2. PIPELINE FLOW METRICS (5 TIERS) ---
   function renderPipelineFlowMetrics(response) {
     const trace = response.pipelineTrace || {};
     const buckets = trace.strategyBuckets || {};
 
     // Tier 1
-    elMetricsT1.innerHTML = `
-      <span>• Free Slots: <b>${trace.freeSlotsCount || 0} slots</b></span>
-      <span>• Tổng giờ trống: <b>${((trace.totalFreeMinutes || 0) / 60).toFixed(1)}h</b></span>
-    `;
+    if (elMetricsT1) {
+      elMetricsT1.innerHTML = `
+        <span>• Free Slots: <b>${trace.freeSlotsCount || 0} slots</b></span>
+        <span>• Tổng giờ trống: <b>${((trace.totalFreeMinutes || 0) / 60).toFixed(1)}h</b></span>
+      `;
+    }
 
     // Tier 2
-    const critCount = (buckets.critical || []).length;
-    const compCount = (buckets.competition || []).length;
-    const normCount = (buckets.normal || []).length;
-    elMetricsT2.innerHTML = `
-      <span>• Critical: <b>${critCount} task</b></span>
-      <span>• Competition: <b>${compCount} task</b></span>
-      <span>• Normal: <b>${normCount} task</b></span>
-    `;
+    if (elMetricsT2) {
+      const critCount = (buckets.critical || []).length;
+      const compCount = (buckets.competition || []).length;
+      const normCount = (buckets.normal || []).length;
+      elMetricsT2.innerHTML = `
+        <span>• Critical: <b>${critCount} task</b></span>
+        <span>• Competition: <b>${compCount} task</b></span>
+        <span>• Normal: <b>${normCount} task</b></span>
+      `;
+    }
 
     // Tier 3
-    elMetricsT3.innerHTML = `
-      <span>• Ứng viên sinh ra: <b>${trace.candidatesEvaluatedCount || 1} kịch bản</b></span>
-      <span>• Chunking: <b>30/45/60/90/120m</b></span>
-    `;
+    if (elMetricsT3) {
+      elMetricsT3.innerHTML = `
+        <span>• Ứng viên sinh ra: <b>${trace.candidatesEvaluatedCount || 1} kịch bản</b></span>
+        <span>• Chunking: <b>30/45/60/90/120m</b></span>
+      `;
+    }
 
     // Tier 4
-    elMetricsT4.innerHTML = `
-      <span>• Repair sửa lỗi: <b>${trace.repairsApplied || 0} lần</b></span>
-      <span>• 2-Opt cải thiện: <b>${trace.localSearchSwaps ? 'Có (+Swap)' : '0 (Tối ưu)'}</b></span>
-    `;
+    if (elMetricsT4) {
+      elMetricsT4.innerHTML = `
+        <span>• Repair sửa lỗi: <b>${trace.repairsApplied || 0} lần</b></span>
+        <span>• 2-Opt cải thiện: <b>${trace.localSearchSwaps ? 'Có (+Swap)' : '0 (Tối ưu)'}</b></span>
+      `;
+    }
 
     // Tier 5
-    elMetricsT5.innerHTML = `
-      <span>• Trạng thái: <b>${trace.stabilityAction || 'COMMITTED'}</b></span>
-      <span>• Điểm J toàn cục: <b>${(trace.finalScore || response.score || 0).toFixed(1)}</b></span>
-    `;
+    if (elMetricsT5) {
+      elMetricsT5.innerHTML = `
+        <span>• Trạng thái: <b>${trace.stabilityAction || 'COMMITTED'}</b></span>
+        <span>• Điểm J toàn cục: <b>${(trace.finalScore || response.score || 0).toFixed(1)}</b></span>
+      `;
+    }
   }
 
   // --- 3. SCORE BREAKDOWN RENDERER ---
   function renderScoreBreakdown(scoreObj) {
     if (!scoreObj) return;
 
-    elValEnergy.textContent = `+${(scoreObj.energyBonus || 0).toFixed(1)}`;
-    elValPref.textContent = `+${(scoreObj.preferenceBonus || 0).toFixed(1)}`;
-    elValSwitch.textContent = `-${(scoreObj.switchingPenalty || 0).toFixed(1)}`;
-    elValFrag.textContent = `-${(scoreObj.fragmentationPenalty || 0).toFixed(1)}`;
-    elValTardiness.textContent = `-${(scoreObj.tardinessPenalty || 0).toFixed(1)}`;
+    if (elValEnergy) elValEnergy.textContent = `+${(scoreObj.energyBonus || 0).toFixed(1)}`;
+    if (elValPref) elValPref.textContent = `+${(scoreObj.preferenceBonus || 0).toFixed(1)}`;
+    if (elValSwitch) elValSwitch.textContent = `-${(scoreObj.switchingPenalty || 0).toFixed(1)}`;
+    if (elValFrag) elValFrag.textContent = `-${(scoreObj.fragmentationPenalty || 0).toFixed(1)}`;
+    if (elValTardiness) elValTardiness.textContent = `-${(scoreObj.tardinessPenalty || 0).toFixed(1)}`;
 
     const total = scoreObj.finalScore || 0;
-    elValTotal.textContent = `${total >= 0 ? '+' : ''}${total.toFixed(1)}`;
-    elValTotal.style.color = total >= 0 ? 'var(--emerald)' : 'var(--amber)';
+    if (elValTotal) {
+      elValTotal.textContent = `${total >= 0 ? '+' : ''}${total.toFixed(1)}`;
+      elValTotal.style.color = total >= 0 ? 'var(--emerald)' : 'var(--amber)';
+    }
   }
 
   // --- 4. XAI REPORT RENDERER ---
   function renderXAIReport(xai) {
+    if (!elXaiList) return;
     elXaiList.innerHTML = '';
+
     if (!xai || !xai.taskExplanations || xai.taskExplanations.length === 0) {
       elXaiList.innerHTML = `
         <div class="xai-item">

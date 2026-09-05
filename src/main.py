@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -216,13 +216,41 @@ def get_presets() -> Dict[str, Any]:
         }
     }
 
+from datetime import datetime
+from fastapi import Request
+
+latest_execution_record: Optional[Dict[str, Any]] = None
+
+@app.get("/api/latest-execution")
+def get_latest_execution() -> Dict[str, Any]:
+    if not latest_execution_record:
+        return {
+            "status": "empty",
+            "message": "Chưa có request nào từ n8n được ghi nhận kể từ khi khởi động."
+        }
+    return {
+        "status": "ok",
+        "data": latest_execution_record
+    }
+
 @app.post("/api/schedule", response_model=ScheduleResponse)
-def schedule_tasks(request: ScheduleRequest) -> ScheduleResponse:
+def schedule_tasks(request: ScheduleRequest, raw_req: Request) -> ScheduleResponse:
     try:
         start_time = time.time()
+        client_ip = raw_req.client.host if raw_req.client else "unknown"
         response = run_smart_scheduler_pipeline(request)
         elapsed = time.time() - start_time
         response.message = f"Optimized in {elapsed:.3f}s"
+
+        global latest_execution_record
+        latest_execution_record = {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "client_ip": client_ip,
+            "elapsed_seconds": round(elapsed, 3),
+            "request": request.model_dump(),
+            "response": response.model_dump()
+        }
+
         return response
     except Exception as e:
         import traceback
