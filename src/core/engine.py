@@ -1,8 +1,9 @@
+import time
 from datetime import datetime
 from typing import List, Dict, Optional, Any
 from src.models.schemas import (
     ScheduleRequest, ScheduleResponse, Task, CandidateSchedule,
-    ScheduledSession, UserPreferences
+    ScheduledSession, UserPreferences, PipelineTrace
 )
 from .constraints import (
     parse_iso_datetime, build_planning_horizon, compute_free_slots,
@@ -24,6 +25,7 @@ from .spanning import (
 )
 
 def run_smart_scheduler_pipeline(request: ScheduleRequest) -> ScheduleResponse:
+    start_perf = time.time()
     # Step 1: Normalize current time
     current_time = parse_iso_datetime(request.current_time) if request.current_time else datetime.now()
     if not current_time:
@@ -41,6 +43,7 @@ def run_smart_scheduler_pipeline(request: ScheduleRequest) -> ScheduleResponse:
             sessions=[],
             updatedTasks=[],
             score=0.0,
+            pipelineTrace=PipelineTrace(elapsedSeconds=round(time.time() - start_perf, 3)),
             message="No tasks provided to schedule."
         )
 
@@ -63,6 +66,13 @@ def run_smart_scheduler_pipeline(request: ScheduleRequest) -> ScheduleResponse:
             updatedTasks=updated_tasks,
             score=0.0,
             xaiReport=xai_report,
+            pipelineTrace=PipelineTrace(
+                horizonStart=horizon.start_date.isoformat(),
+                horizonEnd=horizon.end_date.isoformat(),
+                freeSlotsCount=0,
+                totalFreeMinutes=0,
+                elapsedSeconds=round(time.time() - start_perf, 3)
+            ),
             message="No available free slots in planning horizon."
         )
 
@@ -90,9 +100,11 @@ def run_smart_scheduler_pipeline(request: ScheduleRequest) -> ScheduleResponse:
         reverse=True
     )
     best_candidate = evaluated_scenarios[0]
+    initial_score = best_candidate.scoreBreakdown.finalScore if best_candidate.scoreBreakdown else 0.0
 
     # Step 8: Repair Engine
     repaired_schedule = run_schedule_repair_engine(best_candidate, tasks, request.fixedEvents, user_pref)
+    repair_count = sum(1 for s in repaired_schedule.sessions if s.sessionId and s.sessionId.startswith("repair_"))
 
     # Step 9: Time Fencing & Limited Local Search
     repaired_schedule.sessions = partition_time_fences(
@@ -100,6 +112,7 @@ def run_smart_scheduler_pipeline(request: ScheduleRequest) -> ScheduleResponse:
         current_time,
         user_pref.frozenZoneHours or 3
     )
+    score_before_search = repaired_schedule.scoreBreakdown.finalScore if repaired_schedule.scoreBreakdown else initial_score
     optimized_schedule = run_limited_local_search(
         repaired_schedule,
         tasks,
@@ -107,6 +120,8 @@ def run_smart_scheduler_pipeline(request: ScheduleRequest) -> ScheduleResponse:
         user_pref,
         max_iterations=50
     )
+    score_after_search = optimized_schedule.scoreBreakdown.finalScore if optimized_schedule.scoreBreakdown else score_before_search
+    swaps_improved = 1 if score_after_search > score_before_search else 0
 
     # Step 10: Stability Guard Check (Schedule Nervousness Prevention)
     stability_res = check_schedule_stability(
@@ -136,13 +151,38 @@ def run_smart_scheduler_pipeline(request: ScheduleRequest) -> ScheduleResponse:
         else f"Retained existing schedule to avoid nervousness (Improvement {stability_res.improvement_rate}% < threshold {user_pref.rescheduleThreshold * 100}%)"
     )
 
+    final_score = committed_schedule.scoreBreakdown.finalScore if committed_schedule.scoreBreakdown else 0.0
+    elapsed_total = round(time.time() - start_perf, 3)
+
+    trace = PipelineTrace(
+        horizonStart=horizon.start_date.isoformat(),
+        horizonEnd=horizon.end_date.isoformat(),
+        freeSlotsCount=len(free_slots),
+        totalFreeMinutes=sum(s.duration for s in free_slots),
+        strategyBuckets={
+            "critical": [getattr(t, "name", t.id) for t in buckets.critical],
+            "competition": [getattr(t, "name", t.id) for t in buckets.competition],
+            "normal": [getattr(t, "name", t.id) for t in buckets.normal]
+        },
+        candidatesEvaluatedCount=len(candidate_scenarios),
+        repairsApplied=repair_count,
+        localSearchSwaps=swaps_improved,
+        stabilityImprovementRate=stability_res.improvement_rate,
+        stabilityAction="COMMITTED" if stability_res.should_update else "RETAINED",
+        initialScore=initial_score,
+        finalScore=final_score,
+        elapsedSeconds=elapsed_total
+    )
+
     return ScheduleResponse(
         success=True,
         sessions=committed_schedule.sessions,
         updatedTasks=updated_tasks,
-        score=committed_schedule.scoreBreakdown.finalScore if committed_schedule.scoreBreakdown else 0.0,
+        score=final_score,
         scoreBreakdown=committed_schedule.scoreBreakdown,
         xaiReport=xai_report,
         stabilityStatus=stability_msg,
+        pipelineTrace=trace,
         message="Optimization pipeline finished successfully."
     )
+

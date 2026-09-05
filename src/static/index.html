@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Calendar Scheduler - Visual Dashboard</title>
+  <link rel="stylesheet" href="./static/style.css">
+</head>
+<body>
+  <div class="dashboard-container">
+    
+    <!-- Top Header & Action Controls -->
+    <header class="glass-panel dashboard-header">
+      <div class="brand-section">
+        <div class="brand-logo">⚡</div>
+        <div class="brand-info">
+          <h1>Smart Calendar Scheduler</h1>
+          <p>5-Tier AI Engine & Gantt Timeline Visualizer</p>
+        </div>
+      </div>
+
+      <div class="control-bar">
+        <div class="metrics-pill">
+          <span class="status-dot"></span>
+          <span id="engineStatusText">ENGINE READY</span>
+          <span id="executionTime" style="color: var(--text-dim); margin-left: 4px;">• 0ms</span>
+        </div>
+
+        <select id="presetSelect" class="preset-select">
+          <option value="standard_workday">📋 Workday Tiêu Chuẩn</option>
+          <option value="starvation_deadline">🔥 Deadline Gấp & Starvation</option>
+          <option value="task_spanning">🧩 Task Lớn (Spanning 3h)</option>
+        </select>
+
+        <button id="btnOptimize" class="btn-optimize">
+          <span>⚡ Chạy Phân Lịch</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- SECTION 1: Gantt Timeline Visualizer (Hero View) -->
+    <section class="glass-panel timeline-section">
+      <div class="section-title-row">
+        <div class="section-title">
+          <span>📅 Gantt Timeline 24H</span>
+          <span class="badge" id="horizonBadge">Horizon: 08:00 - 20:00</span>
+        </div>
+
+        <div class="legend-bar">
+          <div class="legend-item">
+            <div class="legend-color meeting"></div>
+            <span>Họp / Khoảng bận (Fixed)</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color free"></div>
+            <span>Khe trống (Free Slot)</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color session"></div>
+            <span>Phiên làm việc (Session)</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color frozen"></div>
+            <span>Ranh giới đóng băng (Frozen Zone)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scrollable Timeline Viewport -->
+      <div class="timeline-viewport">
+        <div class="timeline-canvas" id="timelineCanvas">
+          <!-- Time Ruler (Hours labels) -->
+          <div class="timeline-ruler" id="timelineRuler"></div>
+
+          <!-- Timeline Track Container -->
+          <div class="timeline-track" id="timelineTrack">
+            <!-- Dynamic elements injected here: Now Indicator, Frozen Overlay, Free Slots, Fixed Events, Sessions -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2: Pipeline Flow Visualizer (5 Tiers - 12 Steps) -->
+    <section class="glass-panel flow-section">
+      <div class="section-title-row">
+        <div class="section-title">
+          <span>🧬 Pipeline Flow (5 Tầng - 12 Bước)</span>
+          <span class="badge" id="flowStatusBadge">Đồng bộ hai chiều</span>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-muted);">
+          Nhấp vào bất kỳ tầng nào để làm nổi bật các khối liên quan trên Timeline
+        </p>
+      </div>
+
+      <div class="flow-cards-grid">
+        <!-- Tier 1 -->
+        <div class="flow-card" id="cardTier1" data-tier="1">
+          <div class="flow-card-header">
+            <span class="tier-tag">TẦNG 1</span>
+            <span class="tier-badge">CONSTRAINTS</span>
+          </div>
+          <h3>Quy Hoạch & Free Slots</h3>
+          <div class="flow-steps-list">
+            <div class="flow-step-item"><span class="step-bullet">1.</span> Chuẩn hóa thời gian Now</div>
+            <div class="flow-step-item"><span class="step-bullet">2.</span> Cập nhật Bias từ Feedback (EMA)</div>
+            <div class="flow-step-item"><span class="step-bullet">3.</span> Tính Free Slots trừ sự kiện bận</div>
+          </div>
+          <div class="tier-live-metrics" id="metricsTier1">
+            <span>• Free Slots: --</span>
+            <span>• Tổng giờ trống: --</span>
+          </div>
+        </div>
+
+        <!-- Tier 2 -->
+        <div class="flow-card" id="cardTier2" data-tier="2">
+          <div class="flow-card-header">
+            <span class="tier-tag">TẦNG 2</span>
+            <span class="tier-badge">URGENCY</span>
+          </div>
+          <h3>Độ Cấp Thiết & Buckets</h3>
+          <div class="flow-steps-list">
+            <div class="flow-step-item"><span class="step-bullet">4.</span> Tính Dynamic Urgency & Slack</div>
+            <div class="flow-step-item"><span class="step-bullet">5.</span> Starvation Aging (Dời &gt;= 3 lần)</div>
+            <div class="flow-step-item"><span class="step-bullet">6.</span> Phân chia Strategy Buckets</div>
+          </div>
+          <div class="tier-live-metrics" id="metricsTier2">
+            <span>• Critical: --</span>
+            <span>• Competition: --</span>
+            <span>• Normal: --</span>
+          </div>
+        </div>
+
+        <!-- Tier 3 -->
+        <div class="flow-card" id="cardTier3" data-tier="3">
+          <div class="flow-card-header">
+            <span class="tier-tag">TẦNG 3</span>
+            <span class="tier-badge">GENERATION</span>
+          </div>
+          <h3>Chunking & Ứng Viên</h3>
+          <div class="flow-steps-list">
+            <div class="flow-step-item"><span class="step-bullet">7.</span> Băm nhỏ 30/45/60/90/120m</div>
+            <div class="flow-step-item"><span class="step-bullet">8.</span> Sinh kịch bản Batch vs Interleave</div>
+          </div>
+          <div class="tier-live-metrics" id="metricsTier3">
+            <span>• Ứng viên sinh ra: --</span>
+            <span>• Chiến lược: Dynamic</span>
+          </div>
+        </div>
+
+        <!-- Tier 4 -->
+        <div class="flow-card" id="cardTier4" data-tier="4">
+          <div class="flow-card-header">
+            <span class="tier-tag">TẦNG 4</span>
+            <span class="tier-badge">EVALUATION</span>
+          </div>
+          <h3>Hàm Mục Tiêu & Repair</h3>
+          <div class="flow-steps-list">
+            <div class="flow-step-item"><span class="step-bullet">9.</span> Đánh giá hàm toàn cục J</div>
+            <div class="flow-step-item"><span class="step-bullet">10.</span> Repair Engine (Move, Swap, Shrink)</div>
+            <div class="flow-step-item"><span class="step-bullet">11.</span> Time Fencing & 2-Opt Search</div>
+          </div>
+          <div class="tier-live-metrics" id="metricsTier4">
+            <span>• Repair đã áp dụng: --</span>
+            <span>• 2-Opt cải thiện: --</span>
+          </div>
+        </div>
+
+        <!-- Tier 5 -->
+        <div class="flow-card" id="cardTier5" data-tier="5">
+          <div class="flow-card-header">
+            <span class="tier-tag">TẦNG 5</span>
+            <span class="tier-badge">EXPLAINABILITY</span>
+          </div>
+          <h3>Spanning & Báo Cáo XAI</h3>
+          <div class="flow-steps-list">
+            <div class="flow-step-item"><span class="step-bullet">12.</span> Stability Guard & Nervousness</div>
+            <div class="flow-step-item"><span class="step-bullet">•</span> Chốt trạng thái Spanning</div>
+            <div class="flow-step-item"><span class="step-bullet">•</span> Xuất văn bản giải trình XAI</div>
+          </div>
+          <div class="tier-live-metrics" id="metricsTier5">
+            <span>• Trạng thái: COMMITTED</span>
+            <span>• Điểm J: --</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 3: Detail Inspector & XAI Panel -->
+    <section class="inspector-grid">
+      <!-- XAI Explanations -->
+      <div class="glass-panel inspector-card">
+        <div class="section-title">
+          <span>💡 Giải Trình Thuật Toán (XAI Report)</span>
+        </div>
+        <div class="xai-list" id="xaiList">
+          <div class="xai-item">
+            <div class="task-name">Đang chờ khởi tạo...</div>
+            <div>Bấm <b>"⚡ Chạy Phân Lịch"</b> để xem giải trình vị trí từng task.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Score Breakdown -->
+      <div class="glass-panel inspector-card">
+        <div class="section-title">
+          <span>📊 Phân Rã Điểm Số Toàn Cục (J Score)</span>
+        </div>
+        <table class="score-table">
+          <thead>
+            <tr>
+              <th>Hạng Mục Điểm</th>
+              <th style="text-align: right;">Giá Trị</th>
+            </tr>
+          </thead>
+          <tbody id="scoreTableBody">
+            <tr>
+              <td>Thưởng khớp năng lượng (Energy Bonus)</td>
+              <td class="val positive" id="valEnergyBonus">+0.0</td>
+            </tr>
+            <tr>
+              <td>Thưởng thời gian ưa thích (Preference Bonus)</td>
+              <td class="val positive" id="valPrefBonus">+0.0</td>
+            </tr>
+            <tr>
+              <td>Phạt đổi ngữ cảnh (Switch Penalty)</td>
+              <td class="val negative" id="valSwitchPenalty">-0.0</td>
+            </tr>
+            <tr>
+              <td>Phạt phân mảnh thời gian (Frag Penalty)</td>
+              <td class="val negative" id="valFragPenalty">-0.0</td>
+            </tr>
+            <tr>
+              <td>Phạt trễ hạn chót (Tardiness Penalty)</td>
+              <td class="val negative" id="valTardinessPenalty">-0.0</td>
+            </tr>
+            <tr class="score-total-row">
+              <td>TỔNG ĐIỂM HÀM MỤC TIÊU (J)</td>
+              <td class="val" id="valTotalScore" style="color: #818cf8;">0.0</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Dynamic Tooltip -->
+  <div id="dashboardTooltip" class="dashboard-tooltip"></div>
+
+  <script src="./static/app.js"></script>
+</body>
+</html>

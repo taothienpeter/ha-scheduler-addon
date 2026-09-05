@@ -215,6 +215,21 @@ class ScheduleRequest(BaseModel):
     oldSchedule: Optional[List[ScheduledSession]] = None # Previous schedule to check stability
     recentFeedbackEvents: List[UserFeedbackEvent] = Field(default_factory=list)
 
+class PipelineTrace(BaseModel):
+    horizonStart: Optional[str] = None
+    horizonEnd: Optional[str] = None
+    freeSlotsCount: int = 0
+    totalFreeMinutes: int = 0
+    strategyBuckets: Dict[str, List[str]] = Field(default_factory=dict)
+    candidatesEvaluatedCount: int = 0
+    repairsApplied: int = 0
+    localSearchSwaps: int = 0
+    stabilityImprovementRate: float = 0.0
+    stabilityAction: str = "COMMITTED"
+    initialScore: float = 0.0
+    finalScore: float = 0.0
+    elapsedSeconds: float = 0.0
+
 class ScheduleResponse(BaseModel):
     success: bool
     sessions: List[ScheduledSession]
@@ -223,4 +238,5 @@ class ScheduleResponse(BaseModel):
     scoreBreakdown: Optional[ScoreBreakdown] = None
     xaiReport: Optional[XAIReport] = None
     stabilityStatus: Optional[str] = None
+    pipelineTrace: Optional[PipelineTrace] = None
     message: str = "Success"
