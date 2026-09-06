@@ -82,11 +82,32 @@
 
   async function initApp() {
     console.log('%c[Scheduler Dashboard] Running v1.1.8', 'color: #34d399; font-weight: bold; font-size: 14px;');
+    checkLiveHealth();
     setupEventListeners();
     setupN8nSection();
     await loadPresets();
     await triggerOptimization();
     await fetchLatestN8nExecution(true);
+  }
+
+  async function checkLiveHealth() {
+    try {
+      const resp = await fetch(`${BASE_PATH}/health`);
+      if (resp.ok) {
+        const data = await resp.json();
+        const v = data.version || '1.1.8';
+        const badge = document.getElementById('appVersionBadge');
+        if (badge) {
+          badge.textContent = `v${v} LIVE`;
+          badge.style.background = 'rgba(16, 185, 129, 0.2)';
+          badge.style.color = '#34d399';
+        }
+        const fApi = document.getElementById('footerApiVersion');
+        if (fApi) fApi.textContent = `v${v} Online`;
+      }
+    } catch (e) {
+      console.warn('Could not query /health', e);
+    }
   }
 
   function setupEventListeners() {
