@@ -81,7 +81,7 @@
   window.addEventListener('DOMContentLoaded', initApp);
 
   async function initApp() {
-    console.log('%c[Scheduler Dashboard] Running v1.1.9', 'color: #34d399; font-weight: bold; font-size: 14px;');
+    console.log('%c[Scheduler Dashboard] Running v1.2.0', 'color: #34d399; font-weight: bold; font-size: 14px;');
     checkLiveHealth();
     setupEventListeners();
     setupN8nSection();
@@ -95,7 +95,7 @@
       const resp = await fetch(`${BASE_PATH}/health`);
       if (resp.ok) {
         const data = await resp.json();
-        const v = data.version || '1.1.9';
+        const v = data.version || '1.2.0';
         const badge = document.getElementById('appVersionBadge');
         if (badge) {
           badge.textContent = `v${v} LIVE`;
