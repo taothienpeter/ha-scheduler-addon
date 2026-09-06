@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Smart Calendar Scheduler - Visual Dashboard</title>
-  <link rel="stylesheet" href="./static/style.css?v=1.1.6">
+  <link rel="stylesheet" href="./static/style.css?v=1.1.7">
 </head>
 <body>
   <div class="dashboard-container">
@@ -16,7 +19,7 @@
         <div class="brand-info">
           <div style="display: flex; align-items: center; gap: 8px;">
             <h1>Smart Calendar Scheduler</h1>
-            <span class="badge" id="appVersionBadge" style="background: rgba(99, 102, 241, 0.25); color: #c7d2fe; font-size: 0.72rem; padding: 2px 7px; border-radius: 4px; border: 1px solid rgba(99, 102, 241, 0.4);">v1.1.6</span>
+            <span class="badge" id="appVersionBadge" style="background: rgba(99, 102, 241, 0.25); color: #c7d2fe; font-size: 0.72rem; padding: 2px 7px; border-radius: 4px; border: 1px solid rgba(99, 102, 241, 0.4);">v1.1.7</span>
           </div>
           <p>5-Tier AI Engine & Gantt Timeline Visualizer</p>
         </div>
@@ -38,6 +41,10 @@
         <button id="btnOptimize" class="btn-optimize">
           <span>⚡ Chạy Phân Lịch</span>
         </button>
+
+        <button id="btnHardReload" class="btn-secondary" style="padding: 9px 14px; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;" title="Xóa cache và tải mới trang">
+          <span>🔄 Tải Lại Mới</span>
+        </button>
       </div>
     </header>
 
@@ -46,7 +53,7 @@
       <div class="section-title-row">
         <div class="section-title">
           <span>📅 Gantt Timeline 24H</span>
-          <span class="badge" id="horizonBadge">Horizon: 08:00 - 20:00</span>
+          <span class="badge" id="horizonBadge">Đang khởi tạo 24H...</span>
         </div>
 
         <div class="legend-bar">
@@ -348,6 +355,14 @@
   <!-- Dynamic Tooltip -->
   <div id="dashboardTooltip" class="dashboard-tooltip"></div>
 
-  <script src="./static/app.js?v=1.1.6"></script>
+  <script src="./static/app.js?v=1.1.7"></script>
+  <script>
+    // Direct emergency reload hook for immediate cache busting
+    document.getElementById('btnHardReload')?.addEventListener('click', function() {
+      const u = new URL(window.location.href);
+      u.searchParams.set('t', Date.now());
+      window.location.href = u.toString();
+    });
+  </script>
 </body>
 </html>

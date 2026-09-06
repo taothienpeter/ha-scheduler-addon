@@ -105,3 +105,14 @@ def test_latest_execution_captured_after_post():
     assert "response" in rec
     assert rec["response"]["success"] is True
 
+def test_disable_cache_middleware_headers():
+    """Kiểm tra DisableCacheMiddleware gắn headers chống cache cho tất cả responses"""
+    res = client.get("/")
+    assert res.status_code == 200
+    assert "no-cache" in res.headers.get("cache-control", "")
+    assert res.headers.get("pragma") == "no-cache"
+
+    static_res = client.get("/static/style.css")
+    assert static_res.status_code == 200
+    assert "no-cache" in static_res.headers.get("cache-control", "")
+

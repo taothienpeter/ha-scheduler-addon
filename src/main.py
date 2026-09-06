@@ -12,7 +12,7 @@ from .core.engine import run_smart_scheduler_pipeline
 app = FastAPI(
     title="Smart Calendar Scheduler API",
     description="Production-grade AI scheduling engine for Home Assistant (HAOS) & n8n integration",
-    version="1.1.6"
+    version="1.1.7"
 )
 
 # Enable CORS for local and Home Assistant integrations
@@ -23,6 +23,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi import Request
+
+class DisableCacheMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+
+app.add_middleware(DisableCacheMiddleware)
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):

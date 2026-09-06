@@ -81,6 +81,7 @@
   window.addEventListener('DOMContentLoaded', initApp);
 
   async function initApp() {
+    console.log('%c[Scheduler Dashboard] Running v1.1.7', 'color: #34d399; font-weight: bold; font-size: 14px;');
     setupEventListeners();
     setupN8nSection();
     await loadPresets();
@@ -99,6 +100,15 @@
     });
 
     elBtnOptimize.addEventListener('click', () => triggerOptimization());
+
+    const elBtnHardReload = document.getElementById('btnHardReload');
+    if (elBtnHardReload) {
+      elBtnHardReload.addEventListener('click', () => {
+        const u = new URL(window.location.href);
+        u.searchParams.set('t', Date.now());
+        window.location.href = u.toString();
+      });
+    }
 
     // Timeline View Mode Toggles
     if (elBtnMode24h) {
@@ -582,7 +592,10 @@
 
         const leftPct = Math.max(0, Math.min(100, (sMin / totalMinutes) * 100));
         const rightPct = Math.max(0, Math.min(100, (eMin / totalMinutes) * 100));
-        const widthPct = Math.max(1.2, rightPct - leftPct);
+        let widthPct = Math.max(1.2, rightPct - leftPct);
+        if (leftPct + widthPct > 100) {
+          widthPct = Math.max(1.2, 100 - leftPct);
+        }
 
         const block = document.createElement('div');
         block.className = 'fixed-event-block';
@@ -619,7 +632,10 @@
 
         const leftPct = Math.max(0, Math.min(100, (sMin / totalMinutes) * 100));
         const rightPct = Math.max(0, Math.min(100, (eMin / totalMinutes) * 100));
-        const widthPct = Math.max(1.5, rightPct - leftPct);
+        let widthPct = Math.max(1.5, rightPct - leftPct);
+        if (leftPct + widthPct > 100) {
+          widthPct = Math.max(1.5, 100 - leftPct);
+        }
 
         const block = document.createElement('div');
         block.className = 'session-block';
