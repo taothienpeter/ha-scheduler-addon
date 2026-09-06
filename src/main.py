@@ -12,7 +12,7 @@ from .core.engine import run_smart_scheduler_pipeline
 app = FastAPI(
     title="Smart Calendar Scheduler API",
     description="Production-grade AI scheduling engine for Home Assistant (HAOS) & n8n integration",
-    version="1.1.0"
+    version="1.1.1"
 )
 
 # Enable CORS for local and Home Assistant integrations
@@ -40,7 +40,7 @@ def health_check() -> Dict[str, str]:
     return {
         "status": "ok",
         "service": "Smart Calendar Scheduler",
-        "version": "1.1.0"
+        "version": "1.1.1"
     }
 
 @app.get("/api/presets")
