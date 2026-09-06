@@ -81,7 +81,7 @@
   window.addEventListener('DOMContentLoaded', initApp);
 
   async function initApp() {
-    console.log('%c[Scheduler Dashboard] Running v1.1.7', 'color: #34d399; font-weight: bold; font-size: 14px;');
+    console.log('%c[Scheduler Dashboard] Running v1.1.8', 'color: #34d399; font-weight: bold; font-size: 14px;');
     setupEventListeners();
     setupN8nSection();
     await loadPresets();

@@ -1,10 +1,11 @@
 import os
+import re
 import time
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 from .models.schemas import ScheduleRequest, ScheduleResponse
 from .core.engine import run_smart_scheduler_pipeline
@@ -12,7 +13,7 @@ from .core.engine import run_smart_scheduler_pipeline
 app = FastAPI(
     title="Smart Calendar Scheduler API",
     description="Production-grade AI scheduling engine for Home Assistant (HAOS) & n8n integration",
-    version="1.1.7"
+    version="1.1.8"
 )
 
 # Enable CORS for local and Home Assistant integrations
@@ -45,7 +46,19 @@ if os.path.exists(static_dir):
 def get_dashboard():
     index_file = os.path.join(static_dir, "index.html")
     if os.path.exists(index_file):
-        return FileResponse(index_file, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+        with open(index_file, "r", encoding="utf-8") as f:
+            html = f.read()
+        ts = int(time.time())
+        html = re.sub(r'href="\./static/style\.css(\?[^"]*)?"', f'href="./static/style.css?t={ts}"', html)
+        html = re.sub(r'src="\./static/app\.js(\?[^"]*)?"', f'src="./static/app.js?t={ts}"', html)
+        return HTMLResponse(
+            content=html,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
     return {"message": "Smart Calendar Scheduler API is running. Dashboard static files not found."}
 
 @app.get("/health")
@@ -53,7 +66,7 @@ def health_check() -> Dict[str, str]:
     return {
         "status": "ok",
         "service": "Smart Calendar Scheduler",
-        "version": "1.1.6"
+        "version": "1.1.8"
     }
 
 @app.get("/api/presets")
