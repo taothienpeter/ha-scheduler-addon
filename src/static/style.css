@@ -360,7 +360,7 @@ body {
   position: relative;
   height: 32px;
   border-bottom: 1px solid var(--border-subtle);
-  margin-bottom: 12px;
+  margin: 0 28px 12px 28px;
 }
 
 .ruler-tick {
@@ -404,7 +404,7 @@ body {
   height: 100px;
   background: rgba(255, 255, 255, 0.015);
   border-radius: 8px;
-  margin: 0 16px;
+  margin: 0 28px;
 }
 
 /* Now Line Indicator */

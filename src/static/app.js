@@ -780,22 +780,58 @@
     cardEl.classList.add('active');
     AppState.activeTierHighlight = tier;
 
+    const trace = (AppState.currentResponse && AppState.currentResponse.pipelineTrace) || {};
+    const buckets = trace.strategyBuckets || {};
+    const critTasks = new Set(buckets.critical || []);
+    const compTasks = new Set(buckets.competition || []);
+
     // Action per Tier
     if (tier === 1) {
-      // Dim sessions, highlight free space
+      // Focus on Free Slots & Fixed Meetings
       document.querySelectorAll('.session-block').forEach(b => b.classList.add('is-dimmed'));
-    } else if (tier === 2) {
-      // Highlight high-priority sessions
-      document.querySelectorAll('.session-block').forEach(b => {
-        b.classList.remove('is-dimmed');
+      document.querySelectorAll('.fixed-event-block').forEach(b => {
+        b.style.boxShadow = '0 0 16px rgba(255, 255, 255, 0.4)';
+        setTimeout(() => { b.style.boxShadow = ''; }, 2000);
       });
-    } else if (tier === 4) {
-      // Highlight repair actions
+    } else if (tier === 2) {
+      // Highlight Critical & Competition tasks based on Dynamic Urgency
       document.querySelectorAll('.session-block').forEach(b => {
-        if (b.id && b.id.includes('repair')) {
+        const tid = b.dataset.taskId;
+        if (critTasks.has(tid) || compTasks.has(tid)) {
           b.classList.add('is-highlighted');
+          b.classList.remove('is-dimmed');
+        } else {
+          b.classList.add('is-dimmed');
+          b.classList.remove('is-highlighted');
         }
       });
+    } else if (tier === 3) {
+      // Highlight candidate sessions & duration chunking
+      document.querySelectorAll('.session-block').forEach(b => {
+        b.classList.remove('is-dimmed');
+        b.classList.add('is-highlighted');
+      });
+    } else if (tier === 4) {
+      // Highlight repair actions or 2-opt swaps
+      let found = false;
+      document.querySelectorAll('.session-block').forEach(b => {
+        if (b.id && (b.id.includes('repair') || b.id.includes('swap'))) {
+          b.classList.add('is-highlighted');
+          b.classList.remove('is-dimmed');
+          found = true;
+        } else {
+          b.classList.add('is-dimmed');
+        }
+      });
+      if (!found) {
+        // If no repair was needed, celebrate optimal schedule
+        document.querySelectorAll('.session-block').forEach(b => b.classList.remove('is-dimmed'));
+      }
+    } else if (tier === 5) {
+      // Highlight committed sessions and scroll to XAI report
+      document.querySelectorAll('.session-block').forEach(b => b.classList.remove('is-dimmed'));
+      const xaiSec = document.querySelector('.xai-section');
+      if (xaiSec) xaiSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
 
