@@ -18,7 +18,9 @@
     latestN8nExecution: null,
     activeTierHighlight: null,
     selectedSessionId: null,
-    autoSyncTimer: null
+    autoSyncTimer: null,
+    timelineViewMode: '24h', // '24h' (00:00 - 24:00) or 'workday' (06:00 - 22:00)
+    selectedTimelineDate: null // Active date being viewed on timeline
   };
 
   // Color Palettes for Task Sessions
@@ -36,6 +38,9 @@
   const elEngineStatusText = document.getElementById('engineStatusText');
   const elExecutionTime = document.getElementById('executionTime');
   const elHorizonBadge = document.getElementById('horizonBadge');
+  const elTimelineDayTabs = document.getElementById('timelineDayTabs');
+  const elBtnMode24h = document.getElementById('btnMode24h');
+  const elBtnModeWorkday = document.getElementById('btnModeWorkday');
   const elTimelineRuler = document.getElementById('timelineRuler');
   const elTimelineTrack = document.getElementById('timelineTrack');
   const elXaiList = document.getElementById('xaiList');
@@ -88,11 +93,35 @@
       const selectedKey = elPresetSelect.value;
       if (AppState.presets[selectedKey]) {
         AppState.currentPayload = JSON.parse(JSON.stringify(AppState.presets[selectedKey].payload));
+        AppState.selectedTimelineDate = null; // reset to auto-detect
         triggerOptimization();
       }
     });
 
     elBtnOptimize.addEventListener('click', () => triggerOptimization());
+
+    // Timeline View Mode Toggles
+    if (elBtnMode24h) {
+      elBtnMode24h.addEventListener('click', () => {
+        AppState.timelineViewMode = '24h';
+        elBtnMode24h.classList.add('active');
+        if (elBtnModeWorkday) elBtnModeWorkday.classList.remove('active');
+        if (AppState.currentResponse && AppState.currentPayload) {
+          renderGanttTimeline(AppState.currentResponse, AppState.currentPayload);
+        }
+      });
+    }
+
+    if (elBtnModeWorkday) {
+      elBtnModeWorkday.addEventListener('click', () => {
+        AppState.timelineViewMode = 'workday';
+        elBtnModeWorkday.classList.add('active');
+        if (elBtnMode24h) elBtnMode24h.classList.remove('active');
+        if (AppState.currentResponse && AppState.currentPayload) {
+          renderGanttTimeline(AppState.currentResponse, AppState.currentPayload);
+        }
+      });
+    }
 
     // Flow Tier Card Click Handlers (Bi-directional sync)
     document.querySelectorAll('.flow-card').forEach(card => {
@@ -332,6 +361,7 @@
     const exec = AppState.latestN8nExecution;
     AppState.currentPayload = exec.request;
     AppState.currentResponse = exec.response;
+    AppState.selectedTimelineDate = null; // auto-detect date of n8n sessions
 
     // Render onto Gantt Timeline and Pipeline Flow
     renderGanttTimeline(exec.response, exec.request);
@@ -345,11 +375,75 @@
     // Flash Horizon badge to notify user
     elHorizonBadge.style.background = 'rgba(16, 185, 129, 0.3)';
     elHorizonBadge.style.color = '#34d399';
-    elHorizonBadge.textContent = `Lịch thực tế từ n8n (${exec.timestamp})`;
     setTimeout(() => {
       elHorizonBadge.style.background = 'rgba(99, 102, 241, 0.2)';
       elHorizonBadge.style.color = '#a5b4fc';
     }, 2500);
+  }
+
+  // --- ROBUST DATE & TIME PARSING HELPERS ---
+  // Avoids all browser timezone skews by extracting components directly from ISO strings
+  function parseIsoToLocalDateTime(isoStr) {
+    if (!isoStr) return null;
+    const match = String(isoStr).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
+    if (match) {
+      return new Date(
+        parseInt(match[1], 10),
+        parseInt(match[2], 10) - 1,
+        parseInt(match[3], 10),
+        parseInt(match[4], 10),
+        parseInt(match[5], 10),
+        match[6] ? parseInt(match[6], 10) : 0
+      );
+    }
+    const d = new Date(isoStr);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function getDateStringFromIso(isoStr) {
+    if (!isoStr) return '';
+    const match = String(isoStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return match ? match[0] : '';
+  }
+
+  function formatDisplayDate(dateStr) {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateStr;
+  }
+
+  function getAvailableDates(response, requestPayload) {
+    const datesSet = new Set();
+
+    // 1. Collect dates from all scheduled sessions
+    (response.sessions || []).forEach(s => {
+      const d = getDateStringFromIso(s.startTime);
+      if (d) datesSet.add(d);
+    });
+
+    // 2. Collect dates from fixed events
+    (requestPayload.fixedEvents || []).forEach(fe => {
+      const d = getDateStringFromIso(fe.startTime);
+      if (d) datesSet.add(d);
+    });
+
+    // 3. Collect date from current_time
+    if (requestPayload.current_time) {
+      const d = getDateStringFromIso(requestPayload.current_time);
+      if (d) datesSet.add(d);
+    }
+
+    // Fallback: local today
+    if (datesSet.size === 0) {
+      const now = new Date();
+      const d = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      datesSet.add(d);
+    }
+
+    return Array.from(datesSet).sort();
   }
 
   // --- 1. RENDER GANTT TIMELINE ---
@@ -357,86 +451,128 @@
     elTimelineRuler.innerHTML = '';
     elTimelineTrack.innerHTML = '';
 
-    // Determine Timeline Range (08:00 to 20:00 standard, or dynamically fit)
-    const baseDateStr = (requestPayload.current_time || new Date().toISOString()).split('T')[0];
-    const horizonStart = new Date(`${baseDateStr}T08:00:00`);
-    const horizonEnd = new Date(`${baseDateStr}T20:00:00`);
-    const totalMinutes = (horizonEnd - horizonStart) / 60000;
+    if (!response) return;
 
-    elHorizonBadge.textContent = `Horizon: 08:00 - 20:00 (${(totalMinutes/60).toFixed(0)}h)`;
+    // 1.0 Determine Active Date (Anchored to actual sessions/events)
+    const availableDates = getAvailableDates(response, requestPayload);
+    if (!AppState.selectedTimelineDate || !availableDates.includes(AppState.selectedTimelineDate)) {
+      AppState.selectedTimelineDate = availableDates[0];
+    }
+    const activeDate = AppState.selectedTimelineDate;
 
-    // 1.1 Render Ruler Ticks (Every 1 hour)
-    const totalHours = Math.round(totalMinutes / 60);
-    for (let i = 0; i <= totalHours; i++) {
-      const tickMinutes = i * 60;
-      const tickPct = (tickMinutes / totalMinutes) * 100;
-      const tickTime = new Date(horizonStart.getTime() + tickMinutes * 60000);
-      const hoursStr = String(tickTime.getHours()).padStart(2, '0') + ':00';
+    // 1.1 Render Multi-day Tabs
+    if (elTimelineDayTabs) {
+      elTimelineDayTabs.innerHTML = '';
+      if (availableDates.length > 1) {
+        availableDates.forEach(dateStr => {
+          const count = (response.sessions || []).filter(s => getDateStringFromIso(s.startTime) === dateStr).length;
+          const btn = document.createElement('button');
+          btn.className = `day-tab-btn ${dateStr === activeDate ? 'active' : ''}`;
+          btn.textContent = `📅 ${formatDisplayDate(dateStr)} (${count} phiên)`;
+          btn.addEventListener('click', () => {
+            AppState.selectedTimelineDate = dateStr;
+            renderGanttTimeline(response, requestPayload);
+          });
+          elTimelineDayTabs.appendChild(btn);
+        });
+      }
+    }
+
+    // 1.2 Determine Timeline Range based on View Mode
+    const is24h = AppState.timelineViewMode === '24h';
+    const startHour = is24h ? 0 : 6;
+    const endHour = is24h ? 24 : 22;
+    const totalMinutes = (endHour - startHour) * 60;
+
+    elHorizonBadge.textContent = `Ngày: ${formatDisplayDate(activeDate)} • ${is24h ? 'Toàn ngày 24H (00:00 - 24:00)' : 'Giờ làm việc (06:00 - 22:00)'}`;
+
+    // 1.3 Render Ruler Ticks (Every 1 hour)
+    for (let h = startHour; h <= endHour; h++) {
+      const tickMin = (h - startHour) * 60;
+      const tickPct = (tickMin / totalMinutes) * 100;
+      const hoursStr = String(h === 24 ? 24 : (h % 24)).padStart(2, '0') + ':00';
 
       const tick = document.createElement('div');
-      tick.className = 'ruler-tick';
+      const isMajor = (h % 2 === 0);
+      tick.className = `ruler-tick ${isMajor ? 'major' : 'minor'}`;
       tick.style.left = `${tickPct}%`;
       tick.textContent = hoursStr;
       elTimelineRuler.appendChild(tick);
     }
 
-    // 1.2 Render Now Indicator
-    const nowTime = new Date(requestPayload.current_time || new Date());
-    if (nowTime >= horizonStart && nowTime <= horizonEnd) {
-      const nowMinutes = (nowTime - horizonStart) / 60000;
-      const nowPct = (nowMinutes / totalMinutes) * 100;
-      const nowLine = document.createElement('div');
-      nowLine.className = 'now-indicator';
-      nowLine.style.left = `${nowPct}%`;
-      elTimelineTrack.appendChild(nowLine);
+    // 1.4 Render Now Indicator & Frozen Zone (Only on the day matching current_time)
+    const nowTime = requestPayload.current_time 
+      ? parseIsoToLocalDateTime(requestPayload.current_time) 
+      : new Date();
+    const nowDateStr = requestPayload.current_time 
+      ? getDateStringFromIso(requestPayload.current_time) 
+      : `${nowTime.getFullYear()}-${String(nowTime.getMonth() + 1).padStart(2, '0')}-${String(nowTime.getDate()).padStart(2, '0')}`;
 
-      // 1.3 Render Frozen Zone
-      const frozenHours = (requestPayload.userPreferences && requestPayload.userPreferences.frozenZoneHours) || 2;
-      const frozenEnd = new Date(nowTime.getTime() + frozenHours * 3600000);
-      const frozenMinutes = (frozenEnd - horizonStart) / 60000;
-      const frozenEndPct = Math.min(100, (frozenMinutes / totalMinutes) * 100);
-      const frozenWidthPct = Math.max(0, frozenEndPct - nowPct);
+    if (nowDateStr === activeDate && nowTime) {
+      const nowMin = (nowTime.getHours() * 60 + nowTime.getMinutes()) - (startHour * 60);
+      if (nowMin >= 0 && nowMin <= totalMinutes) {
+        const nowPct = (nowMin / totalMinutes) * 100;
+        const nowLine = document.createElement('div');
+        nowLine.className = 'now-indicator';
+        nowLine.style.left = `${nowPct}%`;
+        elTimelineTrack.appendChild(nowLine);
 
-      if (frozenWidthPct > 0) {
-        const frozenOverlay = document.createElement('div');
-        frozenOverlay.className = 'frozen-zone-overlay';
-        frozenOverlay.style.left = `${nowPct}%`;
-        frozenOverlay.style.width = `${frozenWidthPct}%`;
-        frozenOverlay.innerHTML = `<span class="frozen-label">🔒 Đóng băng ${frozenHours}h</span>`;
-        elTimelineTrack.appendChild(frozenOverlay);
+        // Frozen Zone
+        const frozenHours = (requestPayload.userPreferences && requestPayload.userPreferences.frozenZoneHours) || 2;
+        const frozenEndMin = nowMin + frozenHours * 60;
+        const frozenEndPct = Math.min(100, (frozenEndMin / totalMinutes) * 100);
+        const frozenWidthPct = Math.max(0, frozenEndPct - nowPct);
+
+        if (frozenWidthPct > 0) {
+          const frozenOverlay = document.createElement('div');
+          frozenOverlay.className = 'frozen-zone-overlay';
+          frozenOverlay.style.left = `${nowPct}%`;
+          frozenOverlay.style.width = `${frozenWidthPct}%`;
+          frozenOverlay.innerHTML = `<span class="frozen-label">🔒 Đóng băng ${frozenHours}h</span>`;
+          elTimelineTrack.appendChild(frozenOverlay);
+        }
       }
     }
 
-    // 1.4 Render Fixed Events (Meetings)
+    // 1.5 Render Fixed Events (Meetings) on Active Date
     if (requestPayload.fixedEvents) {
       requestPayload.fixedEvents.forEach(fe => {
-        const sTime = new Date(fe.startTime);
-        const eTime = new Date(fe.endTime);
-        if (sTime < horizonEnd && eTime > horizonStart) {
-          const sMin = Math.max(0, (sTime - horizonStart) / 60000);
-          const eMin = Math.min(totalMinutes, (eTime - horizonStart) / 60000);
-          const leftPct = (sMin / totalMinutes) * 100;
-          const widthPct = ((eMin - sMin) / totalMinutes) * 100;
+        if (getDateStringFromIso(fe.startTime) !== activeDate) return;
 
-          const block = document.createElement('div');
-          block.className = 'fixed-event-block';
-          block.style.left = `${leftPct}%`;
-          block.style.width = `${widthPct}%`;
-          block.textContent = `📅 ${fe.name}`;
-          setupTooltip(block, `<b>Sự kiện cố định:</b> ${fe.name}<br>Thời gian: ${formatTime(sTime)} - ${formatTime(eTime)}`);
-          elTimelineTrack.appendChild(block);
-        }
+        const sTime = parseIsoToLocalDateTime(fe.startTime);
+        const eTime = parseIsoToLocalDateTime(fe.endTime);
+        if (!sTime || !eTime) return;
+
+        const sMin = (sTime.getHours() * 60 + sTime.getMinutes()) - (startHour * 60);
+        const eMin = (eTime.getHours() * 60 + eTime.getMinutes()) - (startHour * 60);
+
+        if (eMin <= 0 || sMin >= totalMinutes) return;
+
+        const leftPct = Math.max(0, Math.min(100, (sMin / totalMinutes) * 100));
+        const rightPct = Math.max(0, Math.min(100, (eMin / totalMinutes) * 100));
+        const widthPct = Math.max(1.2, rightPct - leftPct);
+
+        const block = document.createElement('div');
+        block.className = 'fixed-event-block';
+        block.style.left = `${leftPct}%`;
+        block.style.width = `${widthPct}%`;
+        block.textContent = `📅 ${fe.name}`;
+        setupTooltip(block, `<b>Sự kiện cố định:</b> ${fe.name}<br>Thời gian: ${formatTime(sTime)} - ${formatTime(eTime)}`);
+        elTimelineTrack.appendChild(block);
       });
     }
 
-    // 1.5 Render Scheduled Sessions
+    // 1.6 Render Scheduled Sessions on Active Date
     const taskColorMap = {};
     let colorIdx = 0;
 
     if (response.sessions && response.sessions.length > 0) {
       response.sessions.forEach(sess => {
-        const sTime = new Date(sess.startTime);
-        const eTime = new Date(sess.endTime);
+        if (getDateStringFromIso(sess.startTime) !== activeDate) return;
+
+        const sTime = parseIsoToLocalDateTime(sess.startTime);
+        const eTime = parseIsoToLocalDateTime(sess.endTime);
+        if (!sTime || !eTime) return;
 
         if (!taskColorMap[sess.taskId]) {
           taskColorMap[sess.taskId] = TASK_COLORS[colorIdx % TASK_COLORS.length];
@@ -444,16 +580,20 @@
         }
         const color = taskColorMap[sess.taskId];
 
-        const sMin = Math.max(0, (sTime - horizonStart) / 60000);
-        const eMin = Math.min(totalMinutes, (eTime - horizonStart) / 60000);
-        const leftPct = (sMin / totalMinutes) * 100;
-        const widthPct = ((eMin - sMin) / totalMinutes) * 100;
+        const sMin = (sTime.getHours() * 60 + sTime.getMinutes()) - (startHour * 60);
+        const eMin = (eTime.getHours() * 60 + eTime.getMinutes()) - (startHour * 60);
+
+        if (eMin <= 0 || sMin >= totalMinutes) return;
+
+        const leftPct = Math.max(0, Math.min(100, (sMin / totalMinutes) * 100));
+        const rightPct = Math.max(0, Math.min(100, (eMin / totalMinutes) * 100));
+        const widthPct = Math.max(1.5, rightPct - leftPct);
 
         const block = document.createElement('div');
         block.className = 'session-block';
         block.id = `sess_${sess.sessionId || sess.taskId}`;
         block.dataset.taskId = sess.taskId;
-        block.dataset.duration = sess.duration || 60;
+        block.dataset.duration = sess.duration || Math.round((eTime - sTime) / 60000);
         block.style.left = `${leftPct}%`;
         block.style.width = `${widthPct}%`;
         block.style.background = color.bg;
@@ -657,6 +797,7 @@
 
   // --- Helpers ---
   function formatTime(dt) {
+    if (!dt) return '--:--';
     return `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
   }
 

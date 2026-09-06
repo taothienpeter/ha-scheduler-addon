@@ -264,6 +264,80 @@ body {
 .legend-color.session { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
 .legend-color.frozen { background: rgba(244, 63, 94, 0.3); border: 1px solid var(--rose); }
 
+/* Timeline Controls Row */
+.timeline-controls-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.timeline-day-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.day-tab-btn {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.day-tab-btn:hover {
+  color: white;
+  background: rgba(51, 65, 85, 0.8);
+}
+
+.day-tab-btn.active {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: var(--emerald);
+  color: #34d399;
+  font-weight: 600;
+  box-shadow: 0 0 12px var(--emerald-glow);
+}
+
+.timeline-view-modes {
+  display: flex;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.6);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+}
+
+.view-mode-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.view-mode-btn:hover {
+  color: white;
+}
+
+.view-mode-btn.active {
+  background: rgba(99, 102, 241, 0.25);
+  border-color: rgba(99, 102, 241, 0.5);
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 0 10px var(--primary-glow);
+}
+
 /* Timeline Visual Canvas Container */
 .timeline-viewport {
   position: relative;
@@ -277,7 +351,7 @@ body {
 
 .timeline-canvas {
   position: relative;
-  min-width: 900px;
+  min-width: 1200px;
   height: 160px;
 }
 
@@ -307,6 +381,21 @@ body {
   width: 1px;
   height: 6px;
   background: var(--text-dim);
+}
+
+.ruler-tick.major {
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.ruler-tick.major::after {
+  height: 10px;
+  background: #94a3b8;
+}
+
+.ruler-tick.minor {
+  color: #64748b;
+  font-size: 0.68rem;
 }
 
 /* Timeline Track */
