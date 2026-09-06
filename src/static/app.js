@@ -385,7 +385,7 @@
   // Avoids all browser timezone skews by extracting components directly from ISO strings
   function parseIsoToLocalDateTime(isoStr) {
     if (!isoStr) return null;
-    const match = String(isoStr).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
+    const match = String(isoStr).match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?/);
     if (match) {
       return new Date(
         parseInt(match[1], 10),
@@ -456,7 +456,11 @@
     // 1.0 Determine Active Date (Anchored to actual sessions/events)
     const availableDates = getAvailableDates(response, requestPayload);
     if (!AppState.selectedTimelineDate || !availableDates.includes(AppState.selectedTimelineDate)) {
-      AppState.selectedTimelineDate = availableDates[0];
+      // Prioritize date that contains scheduled sessions
+      const dateWithSessions = availableDates.find(d => 
+        (response.sessions || []).some(s => getDateStringFromIso(s.startTime) === d)
+      );
+      AppState.selectedTimelineDate = dateWithSessions || availableDates[0];
     }
     const activeDate = AppState.selectedTimelineDate;
 

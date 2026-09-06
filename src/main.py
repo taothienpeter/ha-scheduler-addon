@@ -12,7 +12,7 @@ from .core.engine import run_smart_scheduler_pipeline
 app = FastAPI(
     title="Smart Calendar Scheduler API",
     description="Production-grade AI scheduling engine for Home Assistant (HAOS) & n8n integration",
-    version="1.1.2"
+    version="1.1.3"
 )
 
 # Enable CORS for local and Home Assistant integrations
@@ -32,7 +32,7 @@ if os.path.exists(static_dir):
 def get_dashboard():
     index_file = os.path.join(static_dir, "index.html")
     if os.path.exists(index_file):
-        return FileResponse(index_file)
+        return FileResponse(index_file, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     return {"message": "Smart Calendar Scheduler API is running. Dashboard static files not found."}
 
 @app.get("/health")
@@ -40,7 +40,7 @@ def health_check() -> Dict[str, str]:
     return {
         "status": "ok",
         "service": "Smart Calendar Scheduler",
-        "version": "1.1.2"
+        "version": "1.1.3"
     }
 
 @app.get("/api/presets")
