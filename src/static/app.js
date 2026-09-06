@@ -490,18 +490,46 @@
 
     elHorizonBadge.textContent = `Ngày: ${formatDisplayDate(activeDate)} • ${is24h ? 'Toàn ngày 24H (00:00 - 24:00)' : 'Giờ làm việc (06:00 - 22:00)'}`;
 
-    // 1.3 Render Ruler Ticks (Every 1 hour)
+    // 1.3 Render Ruler Ticks (Hours Axis) & Vertical Grid Lines in Track
     for (let h = startHour; h <= endHour; h++) {
       const tickMin = (h - startHour) * 60;
       const tickPct = (tickMin / totalMinutes) * 100;
       const hoursStr = String(h === 24 ? 24 : (h % 24)).padStart(2, '0') + ':00';
-
-      const tick = document.createElement('div');
       const isMajor = (h % 2 === 0);
+
+      // Tick on ruler above
+      const tick = document.createElement('div');
       tick.className = `ruler-tick ${isMajor ? 'major' : 'minor'}`;
       tick.style.left = `${tickPct}%`;
       tick.textContent = hoursStr;
       elTimelineRuler.appendChild(tick);
+
+      // Continuous vertical grid line through track below
+      const gridLine = document.createElement('div');
+      gridLine.className = `timeline-grid-line ${isMajor ? 'major' : 'minor'}`;
+      gridLine.style.left = `${tickPct}%`;
+      elTimelineTrack.appendChild(gridLine);
+    }
+
+    // 1.3.1 Render Working Hours Background Zone
+    const userPrefs = requestPayload.userPreferences || {};
+    const wh = userPrefs.working_hours || [480, 1020];
+    if (wh && wh.length === 2) {
+      const whStartMin = wh[0] - (startHour * 60);
+      const whEndMin = wh[1] - (startHour * 60);
+      if (whEndMin > 0 && whStartMin < totalMinutes) {
+        const whLeftPct = Math.max(0, Math.min(100, (whStartMin / totalMinutes) * 100));
+        const whRightPct = Math.max(0, Math.min(100, (whEndMin / totalMinutes) * 100));
+        const whWidthPct = Math.max(0, whRightPct - whLeftPct);
+        if (whWidthPct > 0) {
+          const whZone = document.createElement('div');
+          whZone.className = 'working-hours-zone';
+          whZone.style.left = `${whLeftPct}%`;
+          whZone.style.width = `${whWidthPct}%`;
+          whZone.title = `Giờ làm việc tiêu chuẩn (${Math.floor(wh[0]/60)}:00 - ${Math.floor(wh[1]/60)}:00)`;
+          elTimelineTrack.appendChild(whZone);
+        }
+      }
     }
 
     // 1.4 Render Now Indicator & Frozen Zone (Only on the day matching current_time)

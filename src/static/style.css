@@ -353,6 +353,7 @@ body {
   position: relative;
   min-width: 1200px;
   height: 160px;
+  padding: 0 40px;
 }
 
 /* Time Ruler (Hours Axis) */
@@ -360,7 +361,8 @@ body {
   position: relative;
   height: 32px;
   border-bottom: 1px solid var(--border-subtle);
-  margin: 0 28px 12px 28px;
+  margin: 0 0 12px 0;
+  width: 100%;
 }
 
 .ruler-tick {
@@ -403,8 +405,37 @@ body {
   position: relative;
   height: 100px;
   background: rgba(255, 255, 255, 0.015);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 8px;
-  margin: 0 28px;
+  margin: 0;
+  width: 100%;
+}
+
+/* Vertical Hour Grid Lines Spanning Track */
+.timeline-grid-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.04);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.timeline-grid-line.major {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Working Hours Background Zone */
+.working-hours-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(99, 102, 241, 0.04);
+  border-left: 1px dashed rgba(99, 102, 241, 0.3);
+  border-right: 1px dashed rgba(99, 102, 241, 0.3);
+  pointer-events: none;
+  z-index: 0;
 }
 
 /* Now Line Indicator */
