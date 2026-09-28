@@ -364,6 +364,37 @@ class TestSmartScheduler(unittest.TestCase):
         repaired = run_schedule_repair_engine(sched, [t1, t2], [], self.pref, max_attempts=5)
         self.assertEqual(len(repaired.sessions), 2)
 
+    def test_mixed_naive_and_aware_datetimes_pipeline(self):
+        """Test scheduler pipeline handles mixed naive, UTC (Z), and offset-aware datetimes without crashing"""
+        req = ScheduleRequest(
+            current_time="2026-08-29T08:00:00", # Naive
+            tasks=[
+                Task(id="t_aware", name="Aware Deadline", estimated_effort=60, deadline="2026-08-29T18:00:00Z"),
+                Task(id="t_naive", name="Naive Deadline", estimated_effort=30, deadline="2026-08-29T17:00:00")
+            ],
+            fixedEvents=[
+                FixedEvent(id="ev_utc", name="UTC Event", startTime="2026-08-29T03:00:00Z", endTime="2026-08-29T04:00:00Z", is_busy=True),
+                FixedEvent(id="ev_offset", name="Offset Event", startTime="2026-08-29T14:00:00+07:00", endTime="2026-08-29T15:00:00+07:00", is_busy=True)
+            ],
+            userPreferences=UserPreferences(timezone="Asia/Ho_Chi_Minh", working_hours=[480, 1020], buffer_time=15)
+        )
+        res = run_smart_scheduler_pipeline(req)
+        self.assertTrue(res.success)
+        self.assertGreater(len(res.sessions), 0)
+
+    def test_calculate_dynamic_urgency_aware_and_naive(self):
+        """Test urgency calculation with both aware current_time and naive deadline, and vice-versa"""
+        # Naive current_time with aware deadline (UTC Z)
+        t1 = Task(id="t1", name="Task 1", estimated_effort=30, deadline="2026-08-29T12:00:00Z")
+        res1 = calculate_dynamic_urgency(t1, datetime(2026, 8, 29, 8, 0, 0))
+        self.assertIsNotNone(res1.slack_minutes)
+
+        # Aware current_time with naive deadline
+        t2 = Task(id="t2", name="Task 2", estimated_effort=30, deadline="2026-08-29T12:00:00")
+        aware_now = datetime.fromisoformat("2026-08-29T08:00:00+07:00")
+        res2 = calculate_dynamic_urgency(t2, aware_now)
+        self.assertIsNotNone(res2.slack_minutes)
+
 
 if __name__ == "__main__":
     unittest.main()

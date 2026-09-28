@@ -1,19 +1,106 @@
-from datetime import datetime, timedelta, time
-from typing import List, Dict, Tuple, Optional, Any
+import zoneinfo
+from datetime import datetime, timedelta, time, timezone, tzinfo
+from typing import List, Dict, Tuple, Optional, Any, Union
 from src.models.schemas import Task, FixedEvent, UserPreferences, ScheduledSession, TimeSlot
 
-def parse_iso_datetime(dt_str: Optional[str]) -> Optional[datetime]:
-    if not dt_str:
-        return None
-    try:
-        # Handle ISO strings with Z or timezone offsets
-        clean_str = dt_str.replace("Z", "+00:00")
-        return datetime.fromisoformat(clean_str)
-    except Exception:
+COMMON_TIMEZONE_OFFSETS: Dict[str, timezone] = {
+    "Asia/Ho_Chi_Minh": timezone(timedelta(hours=7)),
+    "Asia/Bangkok": timezone(timedelta(hours=7)),
+    "Asia/Saigon": timezone(timedelta(hours=7)),
+    "Asia/Hanoi": timezone(timedelta(hours=7)),
+    "Asia/Jakarta": timezone(timedelta(hours=7)),
+    "Asia/Singapore": timezone(timedelta(hours=8)),
+    "Asia/Tokyo": timezone(timedelta(hours=9)),
+    "Asia/Seoul": timezone(timedelta(hours=9)),
+    "Europe/London": timezone(timedelta(hours=0)),
+    "America/New_York": timezone(timedelta(hours=-5)),
+    "America/Los_Angeles": timezone(timedelta(hours=-8)),
+}
+
+def resolve_timezone(tz_val: Optional[Union[str, tzinfo]] = None) -> tzinfo:
+    """Safely resolve a timezone string or object, with robust fallbacks for all operating systems."""
+    if isinstance(tz_val, tzinfo):
+        return tz_val
+    if tz_val and isinstance(tz_val, str):
+        cleaned = tz_val.strip()
+        if cleaned.upper() in ("UTC", "Z"):
+            return timezone.utc
+        if cleaned.startswith(("+", "-")) and len(cleaned) in (5, 6):
+            try:
+                sign = 1 if cleaned[0] == "+" else -1
+                parts = cleaned[1:].split(":")
+                h = int(parts[0])
+                m = int(parts[1]) if len(parts) > 1 else int(parts[0][2:4])
+                return timezone(sign * timedelta(hours=h, minutes=m))
+            except Exception:
+                pass
         try:
-            return datetime.strptime(dt_str, "%Y-%m-%dT%H:%M:%S")
+            return zoneinfo.ZoneInfo(cleaned)
         except Exception:
+            pass
+        if cleaned in COMMON_TIMEZONE_OFFSETS:
+            return COMMON_TIMEZONE_OFFSETS[cleaned]
+    # Default to local machine timezone (e.g. SE Asia Standard Time on Windows)
+    try:
+        local_tz = datetime.now().astimezone().tzinfo
+        if local_tz is not None:
+            return local_tz
+    except Exception:
+        pass
+    return timezone(timedelta(hours=7))
+
+def parse_iso_datetime(
+    dt_val: Optional[Union[str, datetime]],
+    target_tz: Optional[tzinfo] = None
+) -> Optional[datetime]:
+    """
+    Parse an ISO-8601 string or normalize an existing datetime.
+    Ensures that returned datetimes are always timezone-aware to prevent
+    'can't subtract offset-naive and offset-aware datetimes' errors.
+    If target_tz is provided, the datetime is converted to target_tz.
+    """
+    if dt_val is None:
+        return None
+    if isinstance(dt_val, datetime):
+        dt = dt_val
+    elif isinstance(dt_val, str):
+        cleaned = dt_val.strip()
+        if not cleaned:
             return None
+        # Handle trailing Z or z as UTC
+        if cleaned.endswith("Z") or cleaned.endswith("z"):
+            cleaned = cleaned[:-1] + "+00:00"
+        try:
+            dt = datetime.fromisoformat(cleaned)
+        except Exception:
+            try:
+                dt = datetime.strptime(cleaned, "%Y-%m-%dT%H:%M:%S")
+            except Exception:
+                try:
+                    dt = datetime.strptime(cleaned, "%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    return None
+    else:
+        return None
+
+    resolved_tz = target_tz or resolve_timezone()
+    if dt.tzinfo is None:
+        # Naive datetime: localize to resolved_tz
+        dt = dt.replace(tzinfo=resolved_tz)
+    elif target_tz is not None:
+        # Aware datetime: convert to target_tz
+        dt = dt.astimezone(target_tz)
+
+    return dt
+
+def ensure_tz_aware(dt: datetime, target_tz: Optional[tzinfo] = None) -> datetime:
+    """Ensure a datetime object is timezone-aware."""
+    tz = target_tz or resolve_timezone()
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=tz)
+    if target_tz is not None:
+        return dt.astimezone(target_tz)
+    return dt
 
 class PlanningHorizon:
     def __init__(self, start_date: datetime, end_date: datetime, total_days: int):
@@ -22,13 +109,15 @@ class PlanningHorizon:
         self.total_days = total_days
 
 def build_planning_horizon(current_time: datetime, tasks: List[Task], max_days: int = 7) -> PlanningHorizon:
+    target_tz = current_time.tzinfo or resolve_timezone()
+    current_time = ensure_tz_aware(current_time, target_tz)
     # Normalize start to midnight of current day
-    start_date = datetime(current_time.year, current_time.month, current_time.day, 0, 0, 0, tzinfo=current_time.tzinfo)
+    start_date = datetime(current_time.year, current_time.month, current_time.day, 0, 0, 0, tzinfo=target_tz)
     
     max_deadline = start_date
     for t in tasks:
         if t.deadline:
-            d_time = parse_iso_datetime(t.deadline)
+            d_time = parse_iso_datetime(t.deadline, target_tz=target_tz)
             if d_time and d_time > max_deadline:
                 max_deadline = d_time
                 
@@ -42,6 +131,8 @@ def compute_free_slots(
     user_pref: UserPreferences,
     current_time: datetime
 ) -> List[TimeSlot]:
+    target_tz = current_time.tzinfo or resolve_timezone(user_pref.timezone if user_pref else None)
+    current_time = ensure_tz_aware(current_time, target_tz)
     free_slots: List[TimeSlot] = []
     
     # Parse fixed events into datetime ranges
@@ -49,8 +140,8 @@ def compute_free_slots(
     for ev in fixed_events:
         if not ev.is_busy:
             continue
-        ev_start = parse_iso_datetime(ev.startTime)
-        ev_end = parse_iso_datetime(ev.endTime)
+        ev_start = parse_iso_datetime(ev.startTime, target_tz=target_tz)
+        ev_end = parse_iso_datetime(ev.endTime, target_tz=target_tz)
         if ev_start and ev_end and ev_end > ev_start:
             # Apply buffer time
             buf = timedelta(minutes=user_pref.buffer_time)
@@ -64,8 +155,8 @@ def compute_free_slots(
 
     for day_offset in range(horizon.total_days):
         day_date = horizon.start_date + timedelta(days=day_offset)
-        day_work_start = datetime.combine(day_date.date(), work_start_time, tzinfo=current_time.tzinfo)
-        day_work_end = datetime.combine(day_date.date(), work_end_time, tzinfo=current_time.tzinfo)
+        day_work_start = datetime.combine(day_date.date(), work_start_time, tzinfo=target_tz)
+        day_work_end = datetime.combine(day_date.date(), work_end_time, tzinfo=target_tz)
 
         # Skip past times for today
         effective_start = max(day_work_start, current_time)
@@ -111,16 +202,18 @@ class ValidationResult:
 def validate_hard_constraints(
     sessions: List[ScheduledSession],
     all_tasks: List[Task],
-    fixed_events: List[FixedEvent]
+    fixed_events: List[FixedEvent],
+    target_tz: Optional[tzinfo] = None
 ) -> ValidationResult:
+    tz = target_tz or resolve_timezone()
     violations: List[str] = []
     task_map: Dict[str, Task] = {t.id: t for t in all_tasks}
 
     # Parse and sort sessions by start time
     parsed_sessions: List[Dict[str, Any]] = []
     for s in sessions:
-        st = parse_iso_datetime(s.startTime)
-        et = parse_iso_datetime(s.endTime)
+        st = parse_iso_datetime(s.startTime, target_tz=tz)
+        et = parse_iso_datetime(s.endTime, target_tz=tz)
         if not st or not et or et <= st:
             violations.append(f"Session {s.sessionId} has invalid start/end timestamps.")
             continue
@@ -147,8 +240,8 @@ def validate_hard_constraints(
     for ev in fixed_events:
         if not ev.is_busy:
             continue
-        st = parse_iso_datetime(ev.startTime)
-        et = parse_iso_datetime(ev.endTime)
+        st = parse_iso_datetime(ev.startTime, target_tz=tz)
+        et = parse_iso_datetime(ev.endTime, target_tz=tz)
         if st and et:
             parsed_fixed.append((ev.name, st, et))
 
@@ -165,7 +258,7 @@ def validate_hard_constraints(
     for s_info in parsed_sessions:
         task = task_map.get(s_info["session"].taskId)
         if task and task.deadline:
-            d_time = parse_iso_datetime(task.deadline)
+            d_time = parse_iso_datetime(task.deadline, target_tz=tz)
             if d_time and s_info["end"] > d_time:
                 violations.append(
                     f"Deadline Violated: Session {s_info['session'].sessionId} ends at {s_info['end']} after deadline {d_time}."

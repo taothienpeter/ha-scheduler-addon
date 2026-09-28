@@ -2,7 +2,7 @@ import math
 from datetime import datetime
 from typing import List, Dict, Optional, Any
 from src.models.schemas import Task, ScheduledSession, CandidateSchedule, ScoreBreakdown, UserPreferences, EnergyProfile
-from .constraints import parse_iso_datetime
+from .constraints import parse_iso_datetime, resolve_timezone
 
 def get_weight(weights: Dict[str, float], keys: List[str], default: float) -> float:
     for k in keys:
@@ -37,6 +37,7 @@ def evaluate_schedule(
     user_pref: UserPreferences
 ) -> CandidateSchedule:
     task_map: Dict[str, Task] = {t.id: t for t in all_tasks}
+    target_tz = resolve_timezone(user_pref.timezone if user_pref else None)
     weights = user_pref.weights or {}
     
     # Support both camelCase and mathematical symbols (w_c, w_t, etc.)
@@ -53,8 +54,8 @@ def evaluate_schedule(
     # 1. Parse and sort sessions chronologically by start time (CRITICAL FIX)
     parsed_sessions = []
     for s in sessions:
-        st = parse_iso_datetime(s.startTime)
-        et = parse_iso_datetime(s.endTime)
+        st = parse_iso_datetime(s.startTime, target_tz=target_tz)
+        et = parse_iso_datetime(s.endTime, target_tz=target_tz)
         if st and et:
             parsed_sessions.append({
                 "session": s,
@@ -76,7 +77,7 @@ def evaluate_schedule(
     for s in parsed_sessions:
         task = task_map.get(s["taskId"])
         if task and task.deadline:
-            d_time = parse_iso_datetime(task.deadline)
+            d_time = parse_iso_datetime(task.deadline, target_tz=target_tz)
             if d_time and s["end"] > d_time:
                 tardiness_minutes += int((s["end"] - d_time).total_seconds() // 60)
     tardiness_penalty = tardiness_minutes * w_tardiness

@@ -3,7 +3,7 @@ import random
 from datetime import datetime, timedelta
 from typing import List, Dict, Tuple, Optional, Any
 from src.models.schemas import Task, ScheduledSession, CandidateSchedule, FixedEvent, UserPreferences
-from .constraints import parse_iso_datetime, validate_hard_constraints
+from .constraints import parse_iso_datetime, validate_hard_constraints, resolve_timezone, ensure_tz_aware
 from .evaluator import evaluate_schedule
 
 def generate_neighbor_state(schedule: CandidateSchedule) -> CandidateSchedule:
@@ -44,8 +44,9 @@ def generate_neighbor_state(schedule: CandidateSchedule) -> CandidateSchedule:
         s = cloned_sessions[idx]
         if not s.isFrozen:
             shift_m = 15 if random.random() > 0.5 else -15
-            st = parse_iso_datetime(s.startTime)
-            et = parse_iso_datetime(s.endTime)
+            target_tz = resolve_timezone()
+            st = parse_iso_datetime(s.startTime, target_tz=target_tz)
+            et = parse_iso_datetime(s.endTime, target_tz=target_tz)
             if st and et:
                 s.startTime = (st + timedelta(minutes=shift_m)).isoformat()
                 s.endTime = (et + timedelta(minutes=shift_m)).isoformat()
@@ -114,7 +115,8 @@ def check_schedule_stability(
         )
 
     # 1. Check if old schedule is still valid with current constraints
-    old_validation = validate_hard_constraints(old_sessions, all_tasks, fixed_events)
+    target_tz = current_time.tzinfo or resolve_timezone(user_pref.timezone if user_pref else None)
+    old_validation = validate_hard_constraints(old_sessions, all_tasks, fixed_events, target_tz=target_tz)
     if not old_validation.valid:
         new_score = new_schedule.scoreBreakdown.finalScore if new_schedule.scoreBreakdown else 0.0
         return StabilityCheckResult(
@@ -170,10 +172,12 @@ def partition_time_fences(
     current_time: datetime,
     frozen_zone_hours: int = 3
 ) -> List[ScheduledSession]:
+    target_tz = current_time.tzinfo or resolve_timezone()
+    current_time = ensure_tz_aware(current_time, target_tz)
     frozen_threshold = current_time + timedelta(hours=frozen_zone_hours)
     result = []
     for s in sessions:
-        st = parse_iso_datetime(s.startTime)
+        st = parse_iso_datetime(s.startTime, target_tz=target_tz)
         s_copy = s.model_copy()
         if st and st < frozen_threshold:
             s_copy.isFrozen = True

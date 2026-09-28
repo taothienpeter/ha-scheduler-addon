@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Dict, Tuple
 from src.models.schemas import Task
-from .constraints import parse_iso_datetime
+from .constraints import parse_iso_datetime, resolve_timezone, ensure_tz_aware
 
 PRIORITY_BASE_SCORES = {
     1: 50.0, # Critical
@@ -12,6 +12,9 @@ PRIORITY_BASE_SCORES = {
 }
 
 def calculate_dynamic_urgency(task: Task, current_time: datetime) -> Task:
+    target_tz = current_time.tzinfo or resolve_timezone()
+    current_time = ensure_tz_aware(current_time, target_tz)
+
     task_copy = task.model_copy()
     remaining = task_copy.remaining_effort if task_copy.remaining_effort is not None else task_copy.estimated_effort
     task_copy.remaining_effort = remaining
@@ -23,7 +26,7 @@ def calculate_dynamic_urgency(task: Task, current_time: datetime) -> Task:
         task_copy.slack_minutes = None
         return task_copy
 
-    deadline_dt = parse_iso_datetime(task_copy.deadline)
+    deadline_dt = parse_iso_datetime(task_copy.deadline, target_tz=target_tz)
     if not deadline_dt:
         task_copy.effectiveUrgency = base_score
         task_copy.slack_minutes = None

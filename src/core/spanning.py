@@ -4,7 +4,7 @@ from src.models.schemas import (
     Task, ScheduledSession, CandidateSchedule, UserPreferences,
     UserFeedbackEvent, XAIReport, XAISummary, TaskExplanation, EnergyProfile
 )
-from .constraints import parse_iso_datetime
+from .constraints import parse_iso_datetime, resolve_timezone
 
 def apply_stateful_spanning(
     schedule: CandidateSchedule,
@@ -92,7 +92,8 @@ def generate_xai_report(
 
         if task.status == "COMPLETED":
             if len(task_sessions) == 1:
-                st = parse_iso_datetime(task_sessions[0].startTime)
+                target_tz = resolve_timezone(user_pref.timezone if user_pref else None)
+                st = parse_iso_datetime(task_sessions[0].startTime, target_tz=target_tz)
                 start_hour = st.hour if st else 9
                 ctx = task.contextType or "general"
                 affinities = energy_prof.contextAffinities.get(ctx) or energy_prof.contextAffinities.get("general", [])
@@ -148,8 +149,9 @@ def generate_xai_report(
         totalScheduledHours=round(total_scheduled_minutes / 60.0, 1)
     )
 
+    target_tz = resolve_timezone(user_pref.timezone if user_pref else None)
     return XAIReport(
-        timestamp=datetime.now().isoformat(),
+        timestamp=datetime.now().astimezone(target_tz).isoformat(),
         summary=summary,
         taskExplanations=task_explanations,
         insightsAndTips=insights_and_tips

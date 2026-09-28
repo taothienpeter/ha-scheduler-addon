@@ -7,7 +7,7 @@ from src.models.schemas import (
 )
 from .constraints import (
     parse_iso_datetime, build_planning_horizon, compute_free_slots,
-    validate_hard_constraints
+    validate_hard_constraints, resolve_timezone, ensure_tz_aware
 )
 from .urgency import (
     calculate_dynamic_urgency, apply_starvation_aging, classify_strategy_buckets
@@ -26,12 +26,19 @@ from .spanning import (
 
 def run_smart_scheduler_pipeline(request: ScheduleRequest) -> ScheduleResponse:
     start_perf = time.time()
-    # Step 1: Normalize current time
-    current_time = parse_iso_datetime(request.current_time) if request.current_time else datetime.now()
-    if not current_time:
-        current_time = datetime.now()
-
     user_pref = request.userPreferences or UserPreferences()
+    target_tz = resolve_timezone(user_pref.timezone)
+
+    # Step 1: Normalize current time
+    if request.current_time:
+        current_time = parse_iso_datetime(request.current_time, target_tz=target_tz)
+    else:
+        current_time = datetime.now().astimezone(target_tz)
+
+    if not current_time:
+        current_time = datetime.now().astimezone(target_tz)
+    else:
+        current_time = ensure_tz_aware(current_time, target_tz)
 
     # Step 2: Adaptive Learning from Feedback (Estimation Bias)
     if request.recentFeedbackEvents:

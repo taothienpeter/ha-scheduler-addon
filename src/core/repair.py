@@ -1,8 +1,8 @@
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Tuple, Optional
 from src.models.schemas import Task, ScheduledSession, CandidateSchedule, FixedEvent, UserPreferences
-from .constraints import parse_iso_datetime, validate_hard_constraints
+from .constraints import parse_iso_datetime, validate_hard_constraints, resolve_timezone
 from .evaluator import evaluate_schedule
 
 def try_move(
@@ -11,9 +11,11 @@ def try_move(
     all_tasks: List[Task],
     fixed_events: List[FixedEvent]
 ) -> Optional[CandidateSchedule]:
+    target_tz = resolve_timezone()
+    min_aware_dt = datetime.min.replace(tzinfo=timezone.utc)
     sessions = sorted(
         [s.model_copy() for s in schedule.sessions],
-        key=lambda x: parse_iso_datetime(x.startTime) or datetime.min
+        key=lambda x: parse_iso_datetime(x.startTime, target_tz=target_tz) or min_aware_dt
     )
     if len(sessions) < 2:
         return None
@@ -28,9 +30,9 @@ def try_move(
         curr_s = candidate_sessions[i]
         next_s = candidate_sessions[i + 1]
 
-        curr_end = parse_iso_datetime(curr_s.endTime)
-        next_start = parse_iso_datetime(next_s.startTime)
-        next_end = parse_iso_datetime(next_s.endTime)
+        curr_end = parse_iso_datetime(curr_s.endTime, target_tz=target_tz)
+        next_start = parse_iso_datetime(next_s.startTime, target_tz=target_tz)
+        next_end = parse_iso_datetime(next_s.endTime, target_tz=target_tz)
 
         if not curr_end or not next_start or not next_end:
             continue
@@ -45,7 +47,7 @@ def try_move(
 
             # Ensure new_next_end doesn't collide with session i+2
             if i + 2 < len(candidate_sessions):
-                subsequent_start = parse_iso_datetime(candidate_sessions[i + 2].startTime)
+                subsequent_start = parse_iso_datetime(candidate_sessions[i + 2].startTime, target_tz=target_tz)
                 if subsequent_start and new_next_end > subsequent_start:
                     continue
 
@@ -82,9 +84,11 @@ def try_swap(
     all_tasks: List[Task],
     fixed_events: List[FixedEvent]
 ) -> Optional[CandidateSchedule]:
+    target_tz = resolve_timezone()
+    min_aware_dt = datetime.min.replace(tzinfo=timezone.utc)
     sessions = sorted(
         [s.model_copy() for s in schedule.sessions],
-        key=lambda x: parse_iso_datetime(x.startTime) or datetime.min
+        key=lambda x: parse_iso_datetime(x.startTime, target_tz=target_tz) or min_aware_dt
     )
     task_map = {t.id: t for t in all_tasks}
 
@@ -100,7 +104,7 @@ def try_swap(
         
         # Only swap if victim has noticeably lower urgency and enough duration
         if victim_urgency < (target_urgency - 20.0) and victim_sess.duration >= needed_duration:
-            v_start = parse_iso_datetime(victim_sess.startTime)
+            v_start = parse_iso_datetime(victim_sess.startTime, target_tz=target_tz)
             if not v_start:
                 continue
 
@@ -146,9 +150,11 @@ def try_shrink(
     all_tasks: List[Task],
     fixed_events: List[FixedEvent]
 ) -> Optional[CandidateSchedule]:
+    target_tz = resolve_timezone()
+    min_aware_dt = datetime.min.replace(tzinfo=timezone.utc)
     sessions = sorted(
         [s.model_copy() for s in schedule.sessions],
-        key=lambda x: parse_iso_datetime(x.startTime) or datetime.min
+        key=lambda x: parse_iso_datetime(x.startTime, target_tz=target_tz) or min_aware_dt
     )
     task_map = {t.id: t for t in all_tasks}
     target_urgency = target_task.effectiveUrgency or 30.0
@@ -160,7 +166,7 @@ def try_shrink(
         
         # If a lower-urgency session is 60m+ or 90m+, shrink by 30m
         if (t.effectiveUrgency or 30.0) < target_urgency and sess.duration >= 60:
-            st = parse_iso_datetime(sess.startTime)
+            st = parse_iso_datetime(sess.startTime, target_tz=target_tz)
             if not st:
                 continue
 
@@ -173,7 +179,7 @@ def try_shrink(
             cloned_sess.endTime = (st + timedelta(minutes=cloned_sess.duration)).isoformat()
 
             # Insert 30m session for target_task
-            insert_start = parse_iso_datetime(cloned_sess.endTime)
+            insert_start = parse_iso_datetime(cloned_sess.endTime, target_tz=target_tz)
             insert_end = insert_start + timedelta(minutes=30)
             new_sess = ScheduledSession(
                 sessionId=f"repair_shrink_{target_task.id}_{len(candidate_sessions) + 1}",

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import List, Dict, Tuple, Optional, Any
 from src.models.schemas import Task, TimeSlot, ScheduledSession, CandidateSchedule
-from .constraints import parse_iso_datetime
+from .constraints import parse_iso_datetime, resolve_timezone
 
 ALLOWED_DURATIONS = [120, 90, 60, 45, 30]
 
@@ -158,7 +158,8 @@ def build_schedule_from_sequence(
             actual_duration = min(target_duration, needed)
 
             # Deadline constraint
-            deadline_dt = parse_iso_datetime(task.deadline) if task.deadline else None
+            target_tz = (slots_copy[0]["startTime"].tzinfo if slots_copy and "startTime" in slots_copy[0] else None) or resolve_timezone()
+            deadline_dt = parse_iso_datetime(task.deadline, target_tz=target_tz) if task.deadline else None
 
             # Find First-Fit slot
             slot_idx = -1
