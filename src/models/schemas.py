@@ -12,7 +12,7 @@ class Task(BaseModel):
     contextType: Optional[str] = "general" # coding, writing, reading, meeting, admin, creative, general
     deadline: Optional[str] = None # ISO format string
     dependencies: List[str] = Field(default_factory=list)
-    status: str = "UNSCHEDULED" # UNSCHEDULED, SCHEDULED, PARTIAL, COMPLETED, DEFERRED
+    status: str = "UNSCHEDULED" # UNSCHEDULED, SCHEDULED, PARTIAL, COMPLETED, DEFERRED, OVERDUE
     deferral_count: int = Field(0, ge=0)
     priority: int = Field(3, ge=1, le=5, description="1 (Critical) to 5 (Lowest)")
     preferredTime: Optional[str] = None # 'morning', 'afternoon', 'evening'
@@ -199,6 +199,7 @@ class XAISummary(BaseModel):
     completedCount: int
     partialCount: int
     deferredCount: int
+    overdueCount: int = 0
     totalScheduledHours: float
 
 class XAIReport(BaseModel):

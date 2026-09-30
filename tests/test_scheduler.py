@@ -230,6 +230,27 @@ class TestTier5_SpanningLearningAndXAI(unittest.TestCase):
         self.assertEqual(updated[0].remaining_effort, 90)
         self.assertTrue(updated[0].isSpanning)
 
+    def test_tier_5_stateful_spanning_overdue(self):
+        """Kiểm tra đánh dấu trạng thái OVERDUE khi hạn chót đã trôi qua trong quá khứ"""
+        now = datetime(2026, 8, 29, 8, 0, 0)
+        task_overdue = Task(
+            id="t_expired",
+            name="Viết báo cáo cũ",
+            estimated_effort=120,
+            remaining_effort=120,
+            deadline="2026-08-28T17:00:00Z",
+            status="UNSCHEDULED"
+        )
+        empty_sched = CandidateSchedule(id="s_empty", sessions=[])
+        updated = apply_stateful_spanning(empty_sched, [task_overdue], current_time=now)
+        self.assertEqual(updated[0].status, "OVERDUE")
+        self.assertEqual(updated[0].remaining_effort, 120)
+        self.assertEqual(updated[0].deferral_count, 1)
+
+        report = generate_xai_report(empty_sched, updated, self.pref, current_time=now)
+        self.assertEqual(report.summary.overdueCount, 1)
+        self.assertIn("expired", report.taskExplanations[0].explanation.lower())
+
     def test_tier_5_adaptive_estimation_bias_learning_ema(self):
         """Kiểm tra tự học sai số ước lượng thời gian qua Exponential Moving Average (EMA)"""
         pref = UserPreferences(estimationBiasFactor=1.0)

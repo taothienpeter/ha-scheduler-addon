@@ -787,12 +787,28 @@
       xaiItem.className = 'xai-item';
       xaiItem.dataset.taskId = item.taskId;
 
-      const reasons = (item.reasons || []).join(' • ') || 'Đã phân bổ vào khung giờ phù hợp nhất.';
+      let statusBadge = '';
+      if (item.status === 'COMPLETED') {
+        statusBadge = '<span style="background: rgba(16,185,129,0.2); color: #34d399; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;">COMPLETED</span>';
+      } else if (item.status === 'PARTIAL') {
+        statusBadge = '<span style="background: rgba(59,130,246,0.2); color: #60a5fa; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;">PARTIAL</span>';
+      } else if (item.status === 'OVERDUE') {
+        statusBadge = '<span style="background: rgba(244,63,94,0.2); color: #f43f5e; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;">🚨 OVERDUE</span>';
+      } else if (item.status === 'DEFERRED') {
+        statusBadge = '<span style="background: rgba(245,158,11,0.2); color: #fbbf24; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;">⏳ DEFERRED</span>';
+      }
+
+      const reasons = item.explanation || (item.reasons || []).join(' • ') || 'Đã phân bổ vào khung giờ phù hợp nhất.';
+      const conflict = item.conflictResolution ? `<div style="margin-top: 4px; font-size: 0.75rem; color: ${item.status === 'OVERDUE' ? '#f43f5e' : '#f59e0b'}; font-weight: 500;">⚠️ ${item.conflictResolution}</div>` : '';
       const warnings = (item.warnings || []).map(w => `<span style="color: var(--amber);">⚠️ ${w}</span>`).join('<br>');
 
       xaiItem.innerHTML = `
-        <div class="task-name">${item.taskName}</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <div class="task-name" style="font-weight: 600;">${item.taskName}</div>
+          <div>${statusBadge}</div>
+        </div>
         <div style="color: var(--text-muted); font-size: 0.78rem;">${reasons}</div>
+        ${conflict}
         ${warnings ? `<div style="margin-top: 4px; font-size: 0.75rem;">${warnings}</div>` : ''}
       `;
 

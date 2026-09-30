@@ -65,8 +65,8 @@ def run_smart_scheduler_pipeline(request: ScheduleRequest) -> ScheduleResponse:
 
     if not free_slots:
         # No free slots available at all
-        updated_tasks = apply_stateful_spanning(CandidateSchedule(id="empty"), tasks)
-        xai_report = generate_xai_report(CandidateSchedule(id="empty"), updated_tasks, user_pref)
+        updated_tasks = apply_stateful_spanning(CandidateSchedule(id="empty"), tasks, current_time=current_time)
+        xai_report = generate_xai_report(CandidateSchedule(id="empty"), updated_tasks, user_pref, current_time=current_time)
         return ScheduleResponse(
             success=True,
             sessions=[],
@@ -147,10 +147,10 @@ def run_smart_scheduler_pipeline(request: ScheduleRequest) -> ScheduleResponse:
     committed_schedule = evaluate_schedule(committed_schedule, tasks, user_pref)
 
     # Step 11: Stateful Spanning & State Transitions
-    updated_tasks = apply_stateful_spanning(committed_schedule, tasks)
+    updated_tasks = apply_stateful_spanning(committed_schedule, tasks, current_time=current_time)
 
     # Step 12: Explainable AI Report
-    xai_report = generate_xai_report(committed_schedule, updated_tasks, user_pref)
+    xai_report = generate_xai_report(committed_schedule, updated_tasks, user_pref, current_time=current_time)
 
     stability_msg = (
         f"Committed new schedule (Reason: {stability_res.reason}, Improvement: {stability_res.improvement_rate}%)"
