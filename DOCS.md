@@ -141,7 +141,66 @@ Dưới đây là một ví dụ JSON đầy đủ với tất cả các trườ
 | **`buffer_time`** | `int` | `15` | Số phút nghỉ/đệm an toàn trước và sau mỗi cuộc họp cố định. |
 | **`rescheduleThreshold`**| `float` | `0.10` | Ngưỡng cải thiện điểm số (10%) cần đạt để thay đổi lịch cũ, chống đổi lịch liên tục gây xáo trộn (*Schedule Nervousness*). |
 | **`maxDeferralThreshold`**| `int` | `3` | Số lần bị dời tối đa trước khi task được gắn cờ báo động khẩn cấp (*Starvation Warning*). |
+| **`estimationBiasFactor`** | `float` | `1.15` | Hệ số bù trừ ước tính thời lượng (AI tự động cập nhật qua `recentFeedbackEvents`). |
 | **`weights`** | `object` | `{...}` | Trọng số phạt/thưởng của hàm mục tiêu toàn cục (Utility Function). |
+
+---
+
+#### E. Chi tiết Sự kiện Phản hồi Thực tế (`recentFeedbackEvents[...]`):
+
+Trường `recentFeedbackEvents` là kênh **học hỏi thích ứng (Adaptive Learning Loop)** của thuật toán nhằm khắc phục hội chứng *Planning Fallacy* (con người có xu hướng ước lượng thời gian quá lạc quan).
+
+##### Mẫu JSON:
+```json
+[
+  {
+    "eventType": "TASK_COMPLETED",
+    "taskId": "task_1",
+    "contextType": "writing",
+    "scheduledDuration": 60,
+    "actualDuration": 90,
+    "timestamp": "2026-08-29T11:30:00+07:00"
+  },
+  {
+    "eventType": "TASK_MOVED_BY_USER",
+    "taskId": "task_2",
+    "scheduledDuration": 60,
+    "newUserStartTime": "2026-08-29T15:00:00+07:00"
+  }
+]
+```
+
+##### Bảng giải thích chi tiết:
+| Trường | Kiểu | Bắt buộc | Ý nghĩa |
+| :--- | :--- | :---: | :--- |
+| **`eventType`** | `string` | **Có** | Loại sự kiện phản hồi:<br>• `'TASK_COMPLETED'`: Người dùng bấm hoàn thành một công việc.<br>• `'TASK_MOVED_BY_USER'`: Người dùng tự tay kéo dời phiên làm việc sang giờ khác trên giao diện. |
+| **`taskId`** | `string` | **Có** | ID của công việc tương ứng. |
+| **`contextType`** | `string` | Không | Ngữ cảnh của công việc (`'coding'`, `'writing'`, `'general'`). |
+| **`scheduledDuration`** | `int` | **Có** | Thời lượng mà thuật toán đã phân bổ cho phiên làm việc đó (phút, $> 0$). |
+| **`actualDuration`** | `int` | Không | Số phút **thực tế** mà người dùng mất để làm xong công việc. Dùng để tính tỷ lệ sai số $\text{ratio} = \frac{\text{actualDuration}}{\text{scheduledDuration}}$. |
+| **`newUserStartTime`** | `string` (ISO) | Không | Mốc giờ mới do người dùng chủ động kéo dời đến (áp dụng cho `TASK_MOVED_BY_USER`). |
+| **`timestamp`** | `string` (ISO) | Không | Thời điểm ghi nhận hành động hoàn thành. |
+
+##### Thuật toán học hỏi như thế nào?
+- Mỗi khi nhận danh sách này, thuật toán cập nhật `estimationBiasFactor` theo công thức **Exponential Moving Average (EMA)** với tốc độ học $\alpha = 0.15$:
+  $$\text{factor}_{mới} = (1 - 0.15) \cdot \text{factor}_{cũ} + 0.15 \cdot \text{observed\_ratio}$$
+- Nếu phát hiện bạn thường xuyên cần nhiều hơn 25% thời gian so với ước tính, hệ thống sẽ tự động bù đắp khoảng đệm và phát cảnh báo trong `xaiReport.insightsAndTips`.
+
+##### Workflow thực tế trong n8n / Home Assistant:
+1. Khi người dùng bấm hoàn thành task trên Home Assistant Todo hoặc Todoist, n8n tính $\text{actualDuration} = \text{thời điểm bấm Done} - \text{thời điểm bắt đầu session}$.
+2. n8n lưu sự kiện này vào hàng đợi tạm (Queue/Datastore).
+3. Ở lần xếp lịch tiếp theo (ví dụ sáng mai), n8n truyền mảng các sự kiện này vào `recentFeedbackEvents` rồi làm rỗng hàng đợi.
+
+---
+
+#### F. Chi tiết Lịch Cũ Kiểm tra Độ Ổn định (`oldSchedule[...]`):
+
+Dùng để ngăn chặn hiện tượng **Lịch bị bồn chồn (Schedule Nervousness)** — tránh việc đảo lộn lịch của người dùng nếu lịch mới chỉ tối ưu hơn một chút ($< 10\%$).
+
+- **Định dạng:** Nhận vào chính mảng `sessions` mà API đã trả về ở lần chạy trước.
+- **Quy tắc:**
+  - Nếu `oldSchedule` bị xung đột với các cuộc họp mới thêm vào (`fixedEvents`) hoặc có task quá hạn: Bắt buộc đổi sang lịch mới (`COMMITTED`).
+  - Nếu `oldSchedule` vẫn hợp lệ và kịch bản mới không tốt hơn tối thiểu 10% (`rescheduleThreshold`): Thuật toán sẽ từ chối đổi lịch và trả về lịch cũ (`RETAINED`).
 
 ---
 
