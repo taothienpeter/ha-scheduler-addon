@@ -123,13 +123,13 @@ Dưới đây là một ví dụ JSON đầy đủ với tất cả các trườ
 ---
 
 #### C. Chi tiết Sự kiện Cố định (`fixedEvents[...]`):
-| Trường | Kiểu | Bắt buộc | Ý nghĩa |
-| :--- | :--- | :---: | :--- |
-| **`id`** | `string` | Có | Mã duy nhất của sự kiện lịch. |
-| **`name`** | `string` | Có | Tên sự kiện (vd: "Họp Ban Giám Đốc"). |
-| **`startTime`** | `string` (ISO-8601) | Có | Thời điểm bắt đầu sự kiện. |
-| **`endTime`** | `string` (ISO-8601) | Có | Thời điểm kết thúc sự kiện. |
-| **`is_busy`** | `boolean` | Không (`true`) | Nếu `true`, khoảng thời gian này sẽ bị chặn (không thể xếp task vào). |
+| Trường | Kiểu | Bắt buộc | Mặc định | Ý nghĩa |
+| :--- | :--- | :---: | :--- | :--- |
+| **`id`** | `string` | **Có** | - | Mã duy nhất của sự kiện lịch. |
+| **`name`** | `string` | **Có** | - | Tên sự kiện (vd: "Họp Ban Giám Đốc"). |
+| **`startTime`** | `string` (ISO-8601) | **Có** | - | Thời điểm bắt đầu sự kiện. |
+| **`endTime`** | `string` (ISO-8601) | **Có** | - | Thời điểm kết thúc sự kiện. |
+| **`is_busy`** | `boolean` | Không | `true` | Nếu `true`, khoảng thời gian này sẽ bị chặn (không thể xếp task vào). |
 
 ---
 
@@ -171,15 +171,15 @@ Trường `recentFeedbackEvents` là kênh **học hỏi thích ứng (Adaptive 
 ```
 
 ##### Bảng giải thích chi tiết:
-| Trường | Kiểu | Bắt buộc | Ý nghĩa |
-| :--- | :--- | :---: | :--- |
-| **`eventType`** | `string` | **Có** | Loại sự kiện phản hồi:<br>• `'TASK_COMPLETED'`: Người dùng bấm hoàn thành một công việc.<br>• `'TASK_MOVED_BY_USER'`: Người dùng tự tay kéo dời phiên làm việc sang giờ khác trên giao diện. |
-| **`taskId`** | `string` | **Có** | ID của công việc tương ứng. |
-| **`contextType`** | `string` | Không | Ngữ cảnh của công việc (`'coding'`, `'writing'`, `'general'`). |
-| **`scheduledDuration`** | `int` | **Có** | Thời lượng mà thuật toán đã phân bổ cho phiên làm việc đó (phút, $> 0$). |
-| **`actualDuration`** | `int` | Không | Số phút **thực tế** mà người dùng mất để làm xong công việc. Dùng để tính tỷ lệ sai số $\text{ratio} = \frac{\text{actualDuration}}{\text{scheduledDuration}}$. |
-| **`newUserStartTime`** | `string` (ISO) | Không | Mốc giờ mới do người dùng chủ động kéo dời đến (áp dụng cho `TASK_MOVED_BY_USER`). |
-| **`timestamp`** | `string` (ISO) | Không | Thời điểm ghi nhận hành động hoàn thành. |
+| Trường | Kiểu | Bắt buộc | Mặc định | Ý nghĩa |
+| :--- | :--- | :---: | :--- | :--- |
+| **`eventType`** | `string` | **Có** | - | Loại sự kiện phản hồi:<br>• `'TASK_COMPLETED'`: Người dùng bấm hoàn thành một công việc.<br>• `'TASK_MOVED_BY_USER'`: Người dùng tự tay kéo dời phiên làm việc sang giờ khác trên giao diện. |
+| **`taskId`** | `string` | **Có** | - | ID của công việc tương ứng. |
+| **`contextType`** | `string` | Không | `"general"` | Ngữ cảnh của công việc (`'coding'`, `'writing'`, `'general'`). |
+| **`scheduledDuration`** | `int` | **Có** | - | Thời lượng mà thuật toán đã phân bổ cho phiên làm việc đó (phút, $> 0$). |
+| **`actualDuration`** | `int` | Không | `null` | Số phút **thực tế** mà người dùng mất để làm xong công việc. Dùng để tính tỷ lệ sai số $\text{ratio} = \frac{\text{actualDuration}}{\text{scheduledDuration}}$. |
+| **`newUserStartTime`** | `string` (ISO) | Không | `null` | Mốc giờ mới do người dùng chủ động kéo dời đến (áp dụng cho `TASK_MOVED_BY_USER`). |
+| **`timestamp`** | `string` (ISO) | Không | `null` | Thời điểm ghi nhận hành động hoàn thành. |
 
 ##### Thuật toán học hỏi như thế nào?
 - Mỗi khi nhận danh sách này, thuật toán cập nhật `estimationBiasFactor` theo công thức **Exponential Moving Average (EMA)** với tốc độ học $\alpha = 0.15$:
@@ -317,6 +317,112 @@ Dùng để ngăn chặn hiện tượng **Lịch bị bồn chồn (Schedule Ne
   "message": "Optimization pipeline finished successfully."
 }
 ```
+
+---
+
+### 4.1. Giải thích các trường cấp cao nhất (Root Response Object)
+
+| Tên trường | Kiểu dữ liệu | Mặc định | Ý nghĩa & Mục đích sử dụng |
+| :--- | :--- | :---: | :--- |
+| **`success`** | `boolean` | `true` | `true` nếu thuật toán thực thi thành công; `false` nếu xảy ra lỗi. |
+| **`sessions`** | `Array<Session>` | `[]` | **Danh sách các phiên làm việc cụ thể trên trục thời gian.** Dùng để vẽ lên Calendar View hoặc đồng bộ sang Google Calendar / Home Assistant Calendar. |
+| **`updatedTasks`** | `Array<Task>` | `[]` | **Danh sách trạng thái công việc đã được cập nhật.** Dùng để ghi đè lại vào Cơ sở dữ liệu (Todoist, Notion, HA Todo). |
+| **`score`** | `float` | `0.0` | Tổng điểm chất lượng (Utility Score $J$) của lịch trình được chọn. Điểm càng cao lịch càng tối ưu. |
+| **`scoreBreakdown`** | `Object` | *Bộ điểm = 0.0* | Bảng bóc tách chi tiết từng thành phần điểm cộng/điểm trừ tạo nên tổng điểm `score`. |
+| **`xaiReport`** | `Object` | `null` | Báo cáo giải trình AI minh bạch (Explainable AI), giải thích bằng ngôn ngữ tự nhiên lý do vì sao từng task được xếp hoặc bị dời. |
+| **`stabilityStatus`** | `string` | `null` | Thông báo về tính ổn định lịch: Cho biết lịch mới đã được áp dụng (`COMMITTED`) hay giữ nguyên lịch cũ (`RETAINED`) để tránh gây xáo trộn. |
+| **`pipelineTrace`** | `Object` | `null` | Dấu vết thực thi kỹ thuật của thuật toán (số slot tìm thấy, số nhánh ứng viên đã thử, thời gian chạy). |
+| **`message`** | `string` | `"Success"` | Thông điệp tóm tắt từ hệ thống (ví dụ: `"Optimization pipeline finished successfully."`). |
+
+---
+
+### 4.2. Chi tiết từng phiên làm việc trong `sessions[...]`
+
+Mỗi phần tử đại diện cho một **khối thời gian cụ thể** mà người dùng cần bắt tay vào làm việc:
+
+| Trường | Kiểu | Mặc định | Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| **`sessionId`** | `string` | *(Tự động)* | Mã định danh duy nhất của phiên (vd: `"sess_task_1_1"` là phiên thứ nhất của task 1). Dùng làm ID khối trên giao diện kéo-thả hoặc Calendar event ID. |
+| **`taskId`** | `string` | *(Từ task)* | Khóa ngoại liên kết ngược về task gốc: Cho biết phiên này đang thực hiện cho công việc nào. |
+| **`taskName`** | `string` | *(Từ task)* | Tên công việc (để hiển thị trực tiếp lên block lịch mà không cần truy vấn lại task). |
+| **`startTime`** | `string` (ISO) | - | Thời điểm bắt đầu phiên làm việc (kèm múi giờ, vd: `"2026-08-29T09:45:00+07:00"`). |
+| **`endTime`** | `string` (ISO) | - | Thời điểm kết thúc phiên làm việc. |
+| **`duration`** | `int` | - | Thời lượng phiên tính bằng **phút** (vd: 30, 45, 60, 90, 120 phút). |
+| **`contextType`** | `string` | `"general"` | Ngữ cảnh công việc (`'writing'`, `'coding'`, v.v.) dùng để tô màu khác nhau trên giao diện lịch. |
+| **`preferredTime`** | `string` | `null` | Khung giờ vàng ưa thích của task (`'morning'`, `'afternoon'`, hoặc `null`). |
+| **`isFrozen`** | `boolean` | `false` | `true` nếu phiên này nằm trong "khung giờ đóng băng" (gần sát giờ hiện tại), cấm thuật toán tự ý xáo trộn. |
+
+---
+
+### 4.3. Chi tiết trạng thái công việc trong `updatedTasks[...]`
+
+Mỗi phần tử là thực thể công việc sau khi đã được tính toán lại tiến độ:
+
+| Trường | Kiểu | Mặc định / Ban đầu | Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| **`id`** / **`name`** | `string` | *(Từ task)* | ID và Tên công việc. |
+| **`status`** | `string` | `"UNSCHEDULED"` | **Trạng thái cốt lõi mới:**<br>• `COMPLETED`: Đã được xếp lịch đủ 100% thời lượng.<br>• `PARTIAL`: Được xếp một phần hôm nay, còn dở dang sang ngày mai.<br>• `DEFERRED`: Tạm hoãn sang đợt sau do hôm nay thiếu slot rảnh.<br>• `OVERDUE`: Đã quá hạn chót trong quá khứ, cấm xếp vào tương lai. |
+| **`estimated_effort`** | `int` | *(Từ task)* | Tổng thời gian ước tính ban đầu (phút). |
+| **`remaining_effort`** | `int` | `= estimated` | **Số phút còn lại cần làm tiếp** (sẽ bằng 0 nếu `COMPLETED`, hoặc $> 0$ nếu `PARTIAL`/`DEFERRED`/`OVERDUE`). |
+| **`completed_effort`** | `int` | `0` | Tổng số phút tích lũy đã xếp được tính đến thời điểm này. |
+| **`lastScheduledDuration`**| `int` | `0` | Số phút mà task này vừa được phân bổ thêm trong đợt chạy hiện tại. |
+| **`deferral_count`** | `int` | `0` | Số lần task bị dời lịch liên tiếp (tự động tăng nếu bị `DEFERRED`). |
+| **`effectiveUrgency`** | `float` | `null` | Điểm cấp bách động do Tầng B tính toán (càng cao càng được ưu tiên xếp trước). |
+| **`slack_minutes`** | `int` | `null` | **Thời gian rảnh rỗi thực tế còn lại trước deadline** (tính bằng phút). Nếu âm tức là task đã có nguy cơ hoặc đã quá hạn. |
+| **`isStarved`** | `boolean` | `false` | `true` nếu task bị dời quá số lần quy định (`maxDeferralThreshold`) và đang bị "bỏ đói". |
+| **`starvationWarning`** | `string` | `null` | Câu cảnh báo khẩn cấp nếu task bị bỏ đói nhiều lần liên tiếp. |
+| **`isSpanning`** | `boolean` | `false` | `true` nếu task này là công việc lớn trải dài qua nhiều ngày (*Multi-day Spanning*). |
+
+---
+
+### 4.4. Chi tiết Bảng điểm Hàm Mục Tiêu (`scoreBreakdown`)
+
+Hệ thống chấm điểm lịch trình dựa trên công thức hàm mục tiêu đa biến $J$:
+
+| Trường | Tác động | Ý nghĩa |
+| :--- | :---: | :--- |
+| **`completedWorkScore`** | **(+) Cộng điểm** | Thưởng cho tổng số phút công việc được xếp vào lịch thành công (xếp được càng nhiều việc điểm càng cao). |
+| **`userPreferenceBonus`** | **(+) Cộng điểm** | Thưởng khi xếp task đúng vào khung giờ vàng ưa thích (`preferredTime`) hoặc đúng đỉnh năng lượng sinh học. |
+| **`tardinessPenalty`** | **(-) Trừ điểm** | Phạt nặng nếu có phiên làm việc bị hoàn thành sát nút hoặc vượt quá deadline. |
+| **`switchingCostPenalty`**| **(-) Trừ điểm** | Phạt chi phí chuyển đổi ngữ cảnh liên tục (ví dụ: đang code nhảy sang viết văn bản mà không có khoảng nghỉ đệm). |
+| **`fragmentationPenalty`**| **(-) Trừ điểm** | Phạt khi thuật toán tạo ra các khe hở thời gian rác quá nhỏ ($< 30$ phút) không thể tái sử dụng. |
+| **`overloadPenalty`** | **(-) Trừ điểm** | Phạt quá tải nhận thức khi bắt người dùng làm việc liên tục quá 4 tiếng ($> 240$ phút) không nghỉ ngơi. |
+| **`finalScore`** | **Tổng kết** | Điểm tổng cuối cùng sau khi cộng thưởng và trừ phạt. |
+
+---
+
+### 4.5. Chi tiết Báo cáo Giải trình Minh bạch (`xaiReport`)
+
+Cung cấp thông tin trực quan giúp người dùng hiểu được **"Tại sao AI lại xếp lịch như thế này?"**:
+
+- **`xaiReport.summary`**:
+  - `totalTasks`: Tổng số task đưa vào xử lý.
+  - `completedCount`: Số task đã xếp lịch trọn vẹn 100%.
+  - `partialCount`: Số task làm dở dang nhiều ngày (*Multi-day Spanning*).
+  - `deferredCount`: Số task tạm dời sang hôm sau vì thiếu slot.
+  - `overdueCount`: Số task bị quá hạn cần người dùng can thiệp.
+  - `totalScheduledHours`: Tổng số giờ làm việc được lên lịch hôm nay.
+- **`xaiReport.taskExplanations[...]`**:
+  - `explanation`: Lời giải thích tự nhiên (vd: *"Allocated all 90m into your highest productivity window for [coding]"* hoặc *"Deadline has expired..."*).
+  - `energyMatch`: Mức độ khớp nhịp sinh học (vd: `"Optimal (Peak focus at 9:00)"`).
+  - `conflictResolution`: Chỉ dẫn hành động nếu có xung đột (vd: nhắc gia hạn deadline khi bị `OVERDUE`).
+- **`xaiReport.insightsAndTips`**: Mảng các lời khuyên thông minh dựa trên dữ liệu (vd: nhắc nghỉ giải lao nếu làm $> 6$ tiếng, cảnh báo xu hướng ước lượng thiếu giờ).
+
+---
+
+### 4.6. Chi tiết Dấu vết Thực thi (`pipelineTrace`)
+
+Cung cấp thông số kỹ thuật cho lập trình viên và hệ thống tự động hóa:
+
+- **`horizonStart` / `horizonEnd`**: Cửa sổ thời gian thuật toán đã quét (bắt đầu từ ngày nào đến ngày nào).
+- **`freeSlotsCount` / `totalFreeMinutes`**: Tổng số khe trống và tổng số phút rảnh tìm được trong toàn bộ horizon.
+- **`strategyBuckets`**: Cho biết task nào được phân vào nhóm khẩn cấp (`critical`), nhóm cạnh tranh trực tiếp (`competition`), hay nhóm bình thường (`normal`).
+- **`candidatesEvaluatedCount`**: Số lượng kịch bản lịch khác nhau đã được thuật toán sinh ra và so sánh điểm.
+- **`repairsApplied`**: Số thao tác sửa chữa lịch (Move, Swap, Shrink, Split) đã được áp dụng.
+- **`localSearchSwaps`**: Số lần hoán đổi lịch thành công trong thuật toán leo đồi (Local Search).
+- **`stabilityImprovementRate`**: Tỷ lệ phần trăm cải thiện điểm số so với lịch cũ.
+- **`stabilityAction`**: `"COMMITTED"` (áp dụng lịch mới) hoặc `"RETAINED"` (giữ nguyên lịch cũ).
+- **`elapsedSeconds`**: Thời gian thuật toán xử lý tính toán (thường chỉ mất khoảng `0.01s - 0.05s`).
 
 ---
 
